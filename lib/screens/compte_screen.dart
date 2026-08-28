@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// Importation du fichier d'état financier
+import 'etat_financier_screen.dart'; 
 
 class CompteScreen extends StatelessWidget {
   const CompteScreen({super.key});
@@ -27,14 +29,38 @@ class CompteScreen extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          // CORRECTION ICI: CrossAxisAlignment au lieu de CrossAlignment
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text('Documents Comptables', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.black87)),
             const SizedBox(height: 12),
-            _buildDocCard(Icons.description_outlined, 'État financier'),
-            _buildDocCard(Icons.menu_book_outlined, 'Grand livre'),
-            _buildDocCard(Icons.account_balance_outlined, 'Bilan'),
-            _buildDocCard(Icons.balance_outlined, 'Balance'),
+            
+            // Redirection vers le Bilan Comptable SYSCOHADA
+            _buildDocCard(
+              context,
+              Icons.description_outlined,
+              'État financier',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BilanSyscohadaScreen()),
+                );
+              },
+            ),
+            _buildDocCard(context, Icons.menu_book_outlined, 'Grand livre'),
+            _buildDocCard(
+              context,
+              Icons.account_balance_outlined,
+              'Bilan',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BilanSyscohadaScreen()),
+                );
+              },
+            ),
+            _buildDocCard(context, Icons.balance_outlined, 'Balance'),
+            
             const SizedBox(height: 24),
             const Text('Paramètres du Profil', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.black87)),
             const SizedBox(height: 12),
@@ -70,31 +96,37 @@ class CompteScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDocCard(IconData icon, String title) {
+  Widget _buildDocCard(BuildContext context, IconData icon, String title, {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEAF2FF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: const Color(0xFF1B75BC)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: const Color(0xFF1B75BC)),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.grey),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.grey),
-        ],
+        ),
       ),
     );
   }
