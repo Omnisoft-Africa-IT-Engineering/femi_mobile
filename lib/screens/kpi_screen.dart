@@ -6,6 +6,7 @@ class KpiScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -31,7 +32,7 @@ class KpiScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // IA Summary Box
+            // 1. Encadré Résumé IA
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -44,7 +45,7 @@ class KpiScreen extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: const BoxDecoration(
-                      color: Color(0xFF1E75BB),
+                      color: Color(0xFF1B75BC),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
@@ -58,7 +59,8 @@ class KpiScreen extends StatelessWidget {
                         SizedBox(height: 4),
                         Text(
                           'Le chiffre d\'affaires est en hausse de 12% ce mois-ci, mais les dépenses ont augmenté de 8%. Attention au flux de trésorerie dans les 2 prochaines semaines en raison de 3 grosses factures en attente.',
-                          style: TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),                        ),
+                          style: TextStyle(fontSize: 13, height: 1.4, color: Colors.black87),
+                        ),
                       ],
                     ),
                   ),
@@ -67,7 +69,7 @@ class KpiScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // Health Score Header
+            // 2. Score Global
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -86,9 +88,14 @@ class KpiScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
-            // Horizontally Scrollable Cards
+            // ==========================================
+            // KPI ORGANISÉS PAR LIGNE / NIVEAU
+            // ==========================================
+
+            // NIVEAU 1 — Santé de l'entreprise
+            _buildLevelHeader('Niveau 1 — Santé (6 KPI)'),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -96,24 +103,84 @@ class KpiScreen extends StatelessWidget {
                   _buildMetricCard('CHIFFRE D\'AFFAIRES', '15M', '+12% vs mois pr', Colors.green),
                   _buildMetricCard('BÉNÉFICE NET', '3.2M', '+5% vs mois pre', Colors.green),
                   _buildMetricCard('DÉPENSES', '11.8M', '+8% vs mois', Colors.red),
+                  _buildMetricCard('TRÉSORERIE', '4.5M', 'Disponible', Colors.grey),
+                  _buildMetricCard('CLIENTS', '142', '+4 ce mois', Colors.green),
+                  _buildMetricCard('CRÉANCES', '2.1M', '3 retards', Colors.red, warning: true),
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
 
+            // NIVEAU 2 — Activité
+            _buildLevelHeader('Niveau 2 — Activité'),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildMetricCard('TRÉSORERIE', '4.5M', 'Disponible', Colors.grey),
-                  _buildMetricCard('CRÉANCES CLIENTS', '2.1M', '3 factures en retard', Colors.red, warning: true),
-                  _buildMetricCard('NOUVEAUX CLIENTS', '4', 'ce mois', Colors.green),
+                  _buildMetricCard('VENTES', '124', '+18% ce mois', Colors.green),
+                  _buildMetricCard('COMMANDES', '45', '8 en cours', const Color(0xFF1B75BC)),
+                  _buildMetricCard('PANIER MOYEN', '121K', '+2.4%', Colors.green),
+                  _buildMetricCard('PRODUITS', '380', 'En catalogue', Colors.grey),
+                  _buildMetricCard('CLIENTS ACTIFS', '89', 'Récurrents 65%', Colors.green),
+                  _buildMetricCard('PRESTATIONS', '18', 'Achevées: 15', const Color(0xFF1B75BC)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // NIVEAU 3 — Finance
+            _buildLevelHeader('Niveau 3 — Finance'),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildMetricCard('REVENUS', '15.0M', 'Mois en cours', Colors.green),
+                  _buildMetricCard('DÉPENSES', '11.8M', 'Opérationnel', Colors.red),
+                  _buildMetricCard('MARGE BRUTE', '21.3%', 'Cible: 25%', Colors.orange),
+                  _buildMetricCard('BÉNÉFICE', '3.2M', 'Avant impôt', Colors.green),
+                  _buildMetricCard('TRÉSORERIE', '4.5M', 'En banque', const Color(0xFF1B75BC)),
+                  _buildMetricCard('DETTES', '1.8M', 'Échéance < 30j', Colors.red, warning: true),
+                  _buildMetricCard('CRÉANCES', '2.1M', 'A recouvrir', Colors.orange),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // NIVEAU 4 — Opérations
+            _buildLevelHeader('Niveau 4 — Opérations'),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildMetricCard('STOCKS', '85%', '2 alerte stock', Colors.orange, warning: true),
+                  _buildMetricCard('FOURNISSEURS', '12', 'Actifs', Colors.grey),
+                  _buildMetricCard('PRODUCTION', '92%', 'Rendement', Colors.green),
+                  _buildMetricCard('ACHATS', '3.4M', 'Ce mois', Colors.red),
+                  _buildMetricCard('LIVRAISONS', '24', '1 en retard', Colors.orange),
+                  _buildMetricCard('PERSONNEL', '8/8', 'Présents', Colors.green),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // NIVEAU 5 — Intelligence IA
+            _buildLevelHeader('Niveau 5 — Intelligence IA'),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildMetricCard('ANOMALIES', '1', 'Frais transport', Colors.red, warning: true),
+                  _buildMetricCard('TENDANCES', '+15%', 'Service Pro', Colors.green),
+                  _buildMetricCard('PRÉVISIONS', '+5%', 'Croissance T4', const Color(0xFF1B75BC)),
+                  _buildMetricCard('ALERTES', '2', 'Trésorerie/Stock', Colors.orange),
+                  _buildMetricCard('RECOMMAND.', '3', 'Actions dispo', const Color(0xFF1B75BC)),
+                  _buildMetricCard('OPPORTUNITÉS', '12', 'Clients fidèles', Colors.green),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Action Quick Filters
+            // 3. Filtres d'actions rapides
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -127,7 +194,7 @@ class KpiScreen extends StatelessWidget {
             ),
             const SizedBox(height: 20),
 
-            // AI Recommendation Box
+            // 4. Recommandation IA
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -140,7 +207,7 @@ class KpiScreen extends StatelessWidget {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.lightbulb_outline, size: 20),
+                      Icon(Icons.lightbulb_outline, size: 20, color: Color(0xFF1B75BC)),
                       SizedBox(width: 8),
                       Text('Recommandation IA', style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
@@ -159,6 +226,7 @@ class KpiScreen extends StatelessWidget {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF1B75BC),
                             foregroundColor: Colors.white,
+                            elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: const Text('Agir maintenant'),
@@ -185,6 +253,22 @@ class KpiScreen extends StatelessWidget {
     );
   }
 
+  // Titre visuel léger pour séparer les niveaux
+  Widget _buildLevelHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0, top: 4.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade700,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
   Widget _buildMetricCard(String label, String value, String subtitle, Color subColor, {bool warning = false}) {
     return Container(
       width: 140,
@@ -202,7 +286,11 @@ class KpiScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
-                child: Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                child: Text(
+                  label,
+                  style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (warning) const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
             ],

@@ -34,24 +34,68 @@ class BilanSyscohadaScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Sous-titres d'en-tête
-            Text(
-              'ÉTAT FINANCIER SYSCOHADA',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Bilan Comptable',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
+            // Titre + Bouton PDF à côté
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ÉTAT FINANCIER SYSCOHADA',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Bilan Comptable',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Bouton PDF compact à droite du titre
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1B75BC), // Bleu Femi
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () {
+                    // Action de téléchargement PDF
+                  },
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.picture_as_pdf_outlined, color: Colors.white, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'PDF',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(Icons.chevron_right, color: Colors.white, size: 16),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
@@ -193,7 +237,6 @@ class BilanSyscohadaScreen extends StatelessWidget {
                 ),
                 onPressed: () {},
                 child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.auto_awesome, color: Colors.white, size: 20),
                     SizedBox(width: 10),
@@ -208,31 +251,6 @@ class BilanSyscohadaScreen extends StatelessWidget {
                     Spacer(),
                     Icon(Icons.chevron_right, color: Colors.white),
                   ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Bouton Télécharger en PDF
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.black, width: 1.5),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                onPressed: () {},
-                icon: const Icon(Icons.picture_as_pdf_outlined, color: Colors.black, size: 20),
-                label: const Text(
-                  'Télécharger en PDF',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
                 ),
               ),
             ),
