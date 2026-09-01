@@ -1,4 +1,4 @@
-/* import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 class SubscriptionPayScreen extends StatefulWidget {
   final String? targetFeature;
@@ -445,4 +445,4 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       ),
     );
   }
-} */
+}
