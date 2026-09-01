@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/kpi_screen.dart';
-import 'screens/femi_chat_screen.dart';
-import 'screens/compte_screen.dart';
+import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/femi_chat/femi_chat_screen.dart';
+import 'screens/compte/compte_screen.dart';
+import 'screens/subscription_pay/subscription_pay_screen.dart';
 
 void main() {
   runApp(const FemiApp());
@@ -21,6 +22,22 @@ class FemiApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const MainNavigationScreen(),
+      // Configuration des routes de l'application
+      routes: {
+        '/subscription': (context) => const SubscriptionPayScreen(),
+      },
+      // Gestion des arguments dynamiques (ex: targetFeature)
+      onGenerateRoute: (settings) {
+        if (settings.name == '/subscription') {
+          final targetFeature = settings.arguments as String?;
+          return MaterialPageRoute(
+            builder: (context) => SubscriptionPayScreen(
+              targetFeature: targetFeature,
+            ),
+          );
+        }
+        return null;
+      },
     );
   }
 }
@@ -36,7 +53,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _screens = const [
-    KpiScreen(),
+    DashboardScreen(),
     FemiChatScreen(),
     CompteScreen(),
   ];
@@ -44,7 +61,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/compte_card_widget.dart';
 
 class GrandLivreScreen extends StatelessWidget {
   const GrandLivreScreen({super.key});
@@ -33,7 +34,7 @@ class GrandLivreScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Titre & Bouton PDF compact aligné à droite
+            // Titre & Bouton PDF
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -57,9 +58,7 @@ class GrandLivreScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {
-                    // Action de téléchargement PDF
-                  },
+                  onPressed: () {},
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -122,12 +121,23 @@ class GrandLivreScreen extends StatelessWidget {
                             SizedBox(width: 4),
                             Text(
                               'TOTAL DÉBIT',
-                              style: TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         SizedBox(height: 12),
-                        Text('12 450 000', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(
+                          '12 450 000',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         Text('XOF', style: TextStyle(color: Colors.white54, fontSize: 11)),
                       ],
                     ),
@@ -150,12 +160,23 @@ class GrandLivreScreen extends StatelessWidget {
                             SizedBox(width: 4),
                             Text(
                               'TOTAL CRÉDIT',
-                              style: TextStyle(color: Colors.black54, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
                         SizedBox(height: 12),
-                        Text('9 800 000', style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text(
+                          '9 800 000',
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         Text('XOF', style: TextStyle(color: Colors.black45, fontSize: 11)),
                       ],
                     ),
@@ -178,11 +199,22 @@ class GrandLivreScreen extends StatelessWidget {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: const [
-                      Text('SOLDE NET', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54)),
+                      Text(
+                        'SOLDE NET',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black54,
+                        ),
+                      ),
                       SizedBox(height: 4),
                       Text(
                         '2 650 000 XOF',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF00695C)),
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00695C),
+                        ),
                       ),
                     ],
                   ),
@@ -205,163 +237,97 @@ class GrandLivreScreen extends StatelessWidget {
               children: [
                 const Text(
                   'Comptes Actifs',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
                 ),
                 TextButton.icon(
                   onPressed: () {},
                   icon: const Icon(Icons.filter_list, size: 16, color: Colors.black54),
-                  label: const Text('FILTRER', style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'FILTRER',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
             // Compte 1 : Clients - Komi Services
-            _buildCompteCard(
+            const CompteCardWidget(
               code: '411100',
               nom: 'Clients - Komi Services',
               solde: '+ 1 200 000 XOF',
-              soldeColor: const Color(0xFF00695C),
-              headerBgColor: const Color(0xFFE8F3FF),
-              lignes: [
-                _buildLigneMouvement('12 Oct 2023', 'Facture F-2023-089', '500 000'),
-                _buildLigneMouvement('10 Oct 2023', 'Règlement avance', '- 200 000'),
-                _buildLigneMouvement('01 Oct 2023', 'Facture F-2023-085', '900 000'),
+              soldeColor: Color(0xFF00695C),
+              headerBgColor: Color(0xFFE8F3FF),
+              mouvements: [
+                {
+                  'date': '12 Oct 2023',
+                  'libelle': 'Facture F-2023-089',
+                  'montant': '500 000',
+                },
+                {
+                  'date': '10 Oct 2023',
+                  'libelle': 'Règlement avance',
+                  'montant': '- 200 000',
+                },
+                {
+                  'date': '01 Oct 2023',
+                  'libelle': 'Facture F-2023-085',
+                  'montant': '900 000',
+                },
               ],
             ),
             const SizedBox(height: 16),
 
             // Compte 2 : Banque BIAO
-            _buildCompteCard(
+            CompteCardWidget(
               code: '521000',
               nom: 'Banque BIAO',
               solde: '+ 5 450 000 XOF',
               soldeColor: const Color(0xFF00695C),
               headerBgColor: const Color(0xFFE8F3FF),
-              lignes: [
-                _buildLigneMouvement('14 Oct 2023', 'Virement Fournisseur X', '- 1 500 000', montantColor: Colors.red.shade700),
-                _buildLigneMouvement('12 Oct 2023', 'Encaissement Client Y', '2 000 000'),
+              mouvements: [
+                {
+                  'date': '14 Oct 2023',
+                  'libelle': 'Virement Fournisseur X',
+                  'montant': '- 1 500 000',
+                  'montantColor': Colors.red.shade700,
+                },
+                {
+                  'date': '12 Oct 2023',
+                  'libelle': 'Encaissement Client Y',
+                  'montant': '2 000 000',
+                },
               ],
             ),
             const SizedBox(height: 16),
 
             // Compte 3 : Achats Marchandises
-            _buildCompteCard(
+            CompteCardWidget(
               code: '601000',
               nom: 'Achats Marchandises',
               solde: '4 000 000 XOF',
               soldeColor: Colors.red.shade700,
               headerBgColor: const Color(0xFFE8F3FF),
               showHistoryButton: false,
-              lignes: [
-                _buildLigneMouvement('05 Oct 2023', 'Achat Stock Mensuel', '4 000 000'),
+              mouvements: const [
+                {
+                  'date': '05 Oct 2023',
+                  'libelle': 'Achat Stock Mensuel',
+                  'montant': '4 000 000',
+                },
               ],
             ),
             const SizedBox(height: 20),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCompteCard({
-    required String code,
-    required String nom,
-    required String solde,
-    required Color soldeColor,
-    required Color headerBgColor,
-    required List<Widget> lignes,
-    bool showHistoryButton = true,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: headerBgColor,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(code, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54)),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(nom, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('SOLDE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.black45)),
-                    const SizedBox(height: 2),
-                    Text(solde, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: soldeColor)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              children: lignes,
-            ),
-          ),
-          if (showHistoryButton) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: TextButton(
-                onPressed: () {},
-                child: const Text(
-                  'VOIR TOUT L\'HISTORIQUE',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black87),
-                ),
-              ),
-            ),
-          ] else
-            const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLigneMouvement(String date, String libelle, String montant, {Color? montantColor}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(date, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              const SizedBox(height: 2),
-              Text(libelle, style: const TextStyle(fontSize: 13, color: Colors.black87)),
-            ],
-          ),
-          Text(
-            montant,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: montantColor ?? const Color(0xFF00695C)),
-          ),
-        ],
       ),
     );
   }

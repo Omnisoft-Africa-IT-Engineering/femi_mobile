@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 // Import des écrans
-import 'etat_financier_screen.dart';
-import 'grand_livre_screen.dart';
-import 'registre_journalier_screen.dart';
-import 'subscription_pay_screen.dart';
+import '../etat_financier/etat_financier_screen.dart';
+import '../grand_livre/grand_livre_screen.dart';
+import '../registre_journalier/registre_journalier_screen.dart';
+import '../subscription_pay/subscription_pay_screen.dart';
 
 // Import des widgets propres
-import '../widgets/plan_card.dart';
-import '../widgets/doc_tile.dart';
+import 'widgets/plan_card.dart';
+import 'widgets/doc_title.dart';
 
 class CompteScreen extends StatefulWidget {
   const CompteScreen({super.key});
@@ -100,21 +100,21 @@ class _CompteScreenState extends State<CompteScreen> {
             title: 'État financier',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(const BilanSyscohadaScreen(), true),
+            onTap: () => _ouvrirPageControle(EtatFinancierScreen(), true), // SANS const
           ),
           DocTile(
             icon: Icons.menu_book_outlined,
             title: 'Grand livre',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(const GrandLivreScreen(), true),
+            onTap: () => _ouvrirPageControle(GrandLivreScreen(), true), // SANS const
           ),
           DocTile(
             icon: Icons.account_balance_outlined,
             title: 'Bilan',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(const BilanSyscohadaScreen(), true),
+            onTap: () => _ouvrirPageControle(EtatFinancierScreen(), true), // SANS const
           ),
           DocTile(
             icon: Icons.balance_outlined,
