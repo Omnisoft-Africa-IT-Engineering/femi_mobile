@@ -4,12 +4,14 @@ class TotalBilanCard extends StatelessWidget {
   final String totalAmount;
   final String currency;
   final String statusLabel;
+  final String topLabel;
 
   const TotalBilanCard({
     super.key,
     required this.totalAmount,
     this.currency = 'FCFA',
     this.statusLabel = 'ÉQUILIBRÉ',
+    this.topLabel = 'TOTAL BILAN',
   });
 
   @override
@@ -28,7 +30,7 @@ class TotalBilanCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'TOTAL BILAN',
+                  topLabel ,
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

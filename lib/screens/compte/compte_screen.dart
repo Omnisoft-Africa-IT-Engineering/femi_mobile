@@ -5,6 +5,9 @@ import '../etat_financier/etat_financier_screen.dart';
 import '../grand_livre/grand_livre_screen.dart';
 import '../registre_journalier/registre_journalier_screen.dart';
 import '../subscription_pay/subscription_pay_screen.dart';
+import '../balance_generale/balance_generale_screen.dart';
+import '../balance_auxiliaire/balance_auxiliaire_screen.dart';
+
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -121,14 +124,14 @@ class _CompteScreenState extends State<CompteScreen> {
             title: 'Balance générale',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(const Placeholder(), true),
+            onTap: () => _ouvrirPageControle(const BalanceGeneraleScreen(), true),
           ),
           DocTile(
             icon: Icons.swap_horiz_outlined,
             title: 'Balance auxiliaire',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(const Placeholder(), true),
+            onTap: () => _ouvrirPageControle(const BalanceAuxiliaireScreen(), true),
           ),
 
           const SizedBox(height: 20),
