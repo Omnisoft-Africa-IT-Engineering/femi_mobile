@@ -1,8 +1,10 @@
+//import 'package:femi_mobile/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
 import 'screens/subscription_pay/subscription_pay_screen.dart';
+import 'screens/auth/auth_gate.dart';
 
 void main() {
   runApp(const FemiApp());
@@ -21,7 +23,7 @@ class FemiApp extends StatelessWidget {
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
-      home: const MainNavigationScreen(),
+      home: const AuthGate(),
       // Configuration des routes de l'application
       routes: {
         '/subscription': (context) => const SubscriptionPayScreen(),
