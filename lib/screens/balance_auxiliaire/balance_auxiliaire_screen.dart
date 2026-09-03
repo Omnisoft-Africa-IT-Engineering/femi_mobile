@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/pdf_export_service.dart';
 import '../etat_financier/widgets/total_bilan_card.dart';
 import 'widgets/balance_account_table.dart';
 
@@ -88,7 +89,28 @@ class BalanceAuxiliaireScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {},
+              onPressed: () {
+                PdfExportService.exportBalanceAuxiliaire(
+                  clients: clientRows
+                      .map((r) => {
+                    'numero': r.numero,
+                    'libelle': r.libelle,
+                    'debit': r.debit,
+                    'credit': r.credit,
+                    'solde': r.solde,
+                  })
+                      .toList(),
+                  fournisseurs: fournisseurRows
+                      .map((r) => {
+                    'numero': r.numero,
+                    'libelle': r.libelle,
+                    'debit': r.debit,
+                    'credit': r.credit,
+                    'solde': r.solde,
+                  })
+                      .toList(),
+                );
+              },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

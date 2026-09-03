@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/pdf_export_service.dart';
 import 'widgets/balance_account_table.dart';
 
 class BalanceGeneraleScreen extends StatelessWidget {
@@ -84,7 +85,20 @@ class BalanceGeneraleScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              onPressed: () {},
+              onPressed: () {
+                PdfExportService.exportBalance(
+                  title: 'Balance Générale',
+                  rows: rows
+                      .map((r) => {
+                    'numero': r.numero,
+                    'libelle': r.libelle,
+                    'debit': r.debit,
+                    'credit': r.credit,
+                    'solde': r.solde,
+                  })
+                      .toList(),
+                );
+              },
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

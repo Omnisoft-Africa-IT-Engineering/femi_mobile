@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import '../../services/pdf_export_service.dart';
 // Imports des widgets modulaires
 import 'widgets/total_bilan_card.dart';
 import 'widgets/financial_section_card.dart';
@@ -9,6 +9,23 @@ class EtatFinancierScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actifItems = <FinancialItem>[
+      const FinancialItem(label: 'Actif Immobilisé', amount: '65 350 000'),
+      const FinancialItem(label: 'Actif Circulant', amount: '58 100 000'),
+      const FinancialItem(label: 'Trésorerie Actif', amount: '21 800 000'),
+      const FinancialItem(
+          label: 'Total Actif', amount: '145 250 000', isTotal: true),
+    ];
+
+    final passifItems = <FinancialItem>[
+      const FinancialItem(label: 'Capitaux Propres', amount: '82 400 000'),
+      const FinancialItem(label: 'Dettes Financières', amount: '25 000 000'),
+      const FinancialItem(label: 'Passif Circulant', amount: '36 300 000'),
+      const FinancialItem(label: 'Trésorerie Passif', amount: '1 550 000'),
+      const FinancialItem(
+          label: 'Total Passif', amount: '145 250 000', isTotal: true),
+    ];
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
       appBar: AppBar(
@@ -72,16 +89,28 @@ class EtatFinancierScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1B75BC),
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    PdfExportService.exportBilan(
+                      totalAmount: '145 250 000',
+                      actifs: actifItems
+                          .map((i) => {'label': i.label, 'amount': i.amount})
+                          .toList(),
+                      passifs: passifItems
+                          .map((i) => {'label': i.label, 'amount': i.amount})
+                          .toList(),
+                    );
+                  },
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.picture_as_pdf_outlined, color: Colors.white, size: 16),
+                      Icon(Icons.picture_as_pdf_outlined,
+                          color: Colors.white, size: 16),
                       SizedBox(width: 6),
                       Text(
                         'PDF',
@@ -114,30 +143,19 @@ class EtatFinancierScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             // 2. Section ACTIF (Emplois)
-            const FinancialSectionCard(
+            FinancialSectionCard(
               icon: Icons.account_balance_outlined,
               title: 'Actif (Emplois)',
-              items: [
-                FinancialItem(label: 'Actif Immobilisé', amount: '65 350 000'),
-                FinancialItem(label: 'Actif Circulant', amount: '58 100 000'),
-                FinancialItem(label: 'Trésorerie Actif', amount: '21 800 000'),
-                FinancialItem(label: 'Total Actif', amount: '145 250 000', isTotal: true),
-              ],
+              items: actifItems,
             ),
 
             const SizedBox(height: 24),
 
             // 3. Section PASSIF (Ressources)
-            const FinancialSectionCard(
+            FinancialSectionCard(
               icon: Icons.subtitles_outlined,
               title: 'Passif (Ressources)',
-              items: [
-                FinancialItem(label: 'Capitaux Propres', amount: '82 400 000'),
-                FinancialItem(label: 'Dettes Financières', amount: '25 000 000'),
-                FinancialItem(label: 'Passif Circulant', amount: '36 300 000'),
-                FinancialItem(label: 'Trésorerie Passif', amount: '1 550 000'),
-                FinancialItem(label: 'Total Passif', amount: '145 250 000', isTotal: true),
-              ],
+              items: passifItems,
             ),
 
             const SizedBox(height: 24),
