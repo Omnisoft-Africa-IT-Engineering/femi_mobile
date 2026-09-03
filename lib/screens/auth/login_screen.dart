@@ -1,14 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_state.dart';
+import '../../states/auth_state.dart';
 
-/// Écran de connexion — DESIGN UNIQUEMENT (aucune logique d'authentification
-/// pour l'instant). À placer dans : lib/screens/auth/login_screen.dart
-///
-/// Pour l'intégrer plus tard dans main.dart, remplacer :
-///   home: const MainNavigationScreen(),
-/// par :
-///   home: const LoginScreen(),
-/// (ou gérer via un système de routes / état d'authentification)
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -32,6 +24,36 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  // --- Fonction privée de gestion de la connexion ---
+  Future<void> _handleLogin() async {
+    final username = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Appel asynchrone du service backend via AuthState
+    final success = await AuthState.instance.login(username, password);
+
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AuthState.instance.errorMessage.value ?? 'Échec de connexion',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -88,9 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
 
-                // Champ Email
+                // Champ Identifiant / Email
                 const Text(
-                  'Email',
+                  'Nom d\'utilisateur ou Email',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -100,8 +122,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _emailController,
-                  hint: 'exemple@email.com',
-                  icon: Icons.mail_outline,
+                  hint: 'Nom d\'utilisateur ou exemple@email.com',
+                  icon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 20),
@@ -138,9 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      // À implémenter : navigation vers "mot de passe oublié"
-                    },
+                    onPressed: () {},
                     child: Text(
                       'Mot de passe oublié ?',
                       style: TextStyle(
@@ -152,32 +172,42 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Bouton principal "Se connecter"
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      AuthState.instance.login();
-
-                      // Aucune logique d'authentification pour l'instant
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                // Bouton principal avec ValueListenableBuilder pour la charge
+                ValueListenableBuilder<bool>(
+                  valueListenable: AuthState.instance.isLoading,
+                  builder: (context, isLoading, child) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Se connecter',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Se connecter',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
 
@@ -202,9 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () {
-                      // À implémenter : navigation vers l'écran d'inscription
-                    },
+                    onPressed: () {},
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _darkGreen,
                       side: const BorderSide(color: _darkGreen, width: 1.2),
@@ -257,7 +285,7 @@ class _LoginScreenState extends State<LoginScreen> {
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding:
-          const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         ),
       ),
     );

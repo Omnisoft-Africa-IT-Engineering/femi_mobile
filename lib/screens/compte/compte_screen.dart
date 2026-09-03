@@ -7,6 +7,8 @@ import '../registre_journalier/registre_journalier_screen.dart';
 import '../subscription_pay/subscription_pay_screen.dart';
 import '../balance_generale/balance_generale_screen.dart';
 import '../balance_auxiliaire/balance_auxiliaire_screen.dart';
+import '../bilan/bilan_screen.dart';
+
 
 
 // Import des widgets propres
@@ -117,7 +119,7 @@ class _CompteScreenState extends State<CompteScreen> {
             title: 'Bilan',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(EtatFinancierScreen(), true), // SANS const
+            onTap: () => _ouvrirPageControle(BilanScreen(), true), // SANS const
           ),
           DocTile(
             icon: Icons.balance_outlined,
