@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/date_selector_widget.dart';
 import 'widgets/ecriture_card_widget.dart';
 import 'widgets/total_card_widget.dart';
+import '../../services/pdf_export_service.dart';
 
 class RegistreJournalierScreen extends StatefulWidget {
   const RegistreJournalierScreen({super.key});
@@ -164,9 +165,9 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
 
               // Liste des écritures
               ..._ecritures.map((ecriture) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: EcritureCardWidget(ecriture: ecriture),
-                  )),
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: EcritureCardWidget(ecriture: ecriture),
+              )),
 
               const SizedBox(height: 24),
 
@@ -175,7 +176,14 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    PdfExportService.exportRegistreJournalier(
+                      dateText: '12 Octobre 2023',
+                      totalDebit: '12,450.00 €',
+                      totalCredit: '12,450.00 €',
+                      ecritures: _ecritures,
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF006654),
                     shape: RoundedRectangleBorder(

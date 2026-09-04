@@ -1,28 +1,27 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_state.dart';
-import 'sign_up_screen.dart';
 
-/// Écran de connexion — DESIGN UNIQUEMENT (aucune logique d'authentification
-/// pour l'instant). À placer dans : lib/screens/auth/login_screen.dart
-///
-/// Pour l'intégrer plus tard dans main.dart, remplacer :
-///   home: const MainNavigationScreen(),
-/// par :
-///   home: const LoginScreen(),
-/// (ou gérer via un système de routes / état d'authentification)
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+/// Écran de création de compte — DESIGN UNIQUEMENT (aucune logique
+/// d'inscription pour l'instant). À placer dans :
+/// lib/screens/auth/sign_up_screen.dart
+class SignUpScreen extends StatefulWidget {
+  const SignUpScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignUpScreenState extends State<SignUpScreen> {
+  final TextEditingController _nomCompletController = TextEditingController();
+  final TextEditingController _entrepriseController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final TextEditingController _confirmPasswordController =
+  TextEditingController();
 
-  // Palette reprise du reste de l'app (main.dart / dashboard)
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
+  // Palette reprise du reste de l'app (main.dart / dashboard / login)
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
@@ -30,8 +29,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _nomCompletController.dispose();
+    _entrepriseController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -39,6 +41,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bgColor,
+      appBar: AppBar(
+        backgroundColor: _bgColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -46,31 +56,31 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 12),
 
                 // Logo / Icône de l'app
                 Center(
                   child: Container(
-                    width: 88,
-                    height: 88,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       color: _accentTeal,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Icon(
                       Icons.auto_awesome,
                       color: _darkGreen,
-                      size: 40,
+                      size: 32,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 const Center(
                   child: Text(
-                    'Femi',
+                    'Créer un compte',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF1A1A1A),
                     ),
@@ -79,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 Center(
                   child: Text(
-                    'Connectez-vous pour accéder à votre compte',
+                    'Rejoignez Femi et gérez votre comptabilité facilement',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[600],
@@ -87,7 +97,41 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
+
+                // Champ Nom complet
+                const Text(
+                  'Nom complet',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildInputField(
+                  controller: _nomCompletController,
+                  hint: 'Ex: Odette Sogboe',
+                  icon: Icons.person_outline,
+                ),
+                const SizedBox(height: 20),
+
+                // Champ Nom de l'entreprise
+                const Text(
+                  "Nom de l'entreprise",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildInputField(
+                  controller: _entrepriseController,
+                  hint: 'Ex: Komi Services',
+                  icon: Icons.storefront_outlined,
+                ),
+                const SizedBox(height: 20),
 
                 // Champ Email
                 const Text(
@@ -135,32 +179,46 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                 ),
+                const SizedBox(height: 20),
 
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      // À implémenter : navigation vers "mot de passe oublié"
-                    },
-                    child: Text(
-                      'Mot de passe oublié ?',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 13,
-                      ),
-                    ),
+                // Champ Confirmation mot de passe
+                const Text(
+                  'Confirmer le mot de passe',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                _buildInputField(
+                  controller: _confirmPasswordController,
+                  hint: '••••••••',
+                  icon: Icons.lock_outline,
+                  obscureText: _obscureConfirmPassword,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: Colors.grey,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      setState(() =>
+                      _obscureConfirmPassword = !_obscureConfirmPassword);
+                    },
+                  ),
+                ),
+                const SizedBox(height: 32),
 
-                // Bouton principal "Se connecter"
+                // Bouton principal "Créer mon compte"
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
                     onPressed: () {
-                      AuthState.instance.login();
-                      // Aucune logique d'authentification pour l'instant
+                      // Aucune logique d'inscription pour l'instant
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryBlue,
@@ -171,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       elevation: 0,
                     ),
                     child: const Text(
-                      'Se connecter',
+                      'Créer mon compte',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -179,54 +237,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // Séparateur "ou"
-                Row(
-                  children: [
-                    Expanded(child: Divider(color: Colors.grey[300])),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Text(
-                        'ou',
-                        style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                      ),
-                    ),
-                    Expanded(child: Divider(color: Colors.grey[300])),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Bouton secondaire "Créer un compte"
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SignUpScreen(),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _darkGreen,
-                      side: const BorderSide(color: _darkGreen, width: 1.2),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: const Text(
-                      'Créer un compte',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                // Lien retour vers Login
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'Déjà un compte ? ',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                        children: const [
+                          TextSpan(
+                            text: 'Se connecter',
+                            style: TextStyle(
+                              color: _darkGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
               ],
             ),
           ),

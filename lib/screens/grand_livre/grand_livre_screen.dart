@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'widgets/compte_card_widget.dart';
+import '../../services/pdf_export_service.dart';
 
 class GrandLivreScreen extends StatelessWidget {
   const GrandLivreScreen({super.key});
@@ -58,7 +59,66 @@ class GrandLivreScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: () {},
+                  onPressed: () {
+                    PdfExportService.exportGrandLivre(
+                      totalDebit: '12 450 000',
+                      totalCredit: '9 800 000',
+                      soldeNet: '2 650 000 XOF',
+                      comptes: [
+                        {
+                          'code': '411100',
+                          'nom': 'Clients - Komi Services',
+                          'solde': '+ 1 200 000 XOF',
+                          'mouvements': [
+                            {
+                              'date': '12 Oct 2023',
+                              'libelle': 'Facture F-2023-089',
+                              'montant': '500 000',
+                            },
+                            {
+                              'date': '10 Oct 2023',
+                              'libelle': 'Règlement avance',
+                              'montant': '- 200 000',
+                            },
+                            {
+                              'date': '01 Oct 2023',
+                              'libelle': 'Facture F-2023-085',
+                              'montant': '900 000',
+                            },
+                          ],
+                        },
+                        {
+                          'code': '521000',
+                          'nom': 'Banque BIAO',
+                          'solde': '+ 5 450 000 XOF',
+                          'mouvements': [
+                            {
+                              'date': '14 Oct 2023',
+                              'libelle': 'Virement Fournisseur X',
+                              'montant': '- 1 500 000',
+                            },
+                            {
+                              'date': '12 Oct 2023',
+                              'libelle': 'Encaissement Client Y',
+                              'montant': '2 000 000',
+                            },
+                          ],
+                        },
+                        {
+                          'code': '601000',
+                          'nom': 'Achats Marchandises',
+                          'solde': '4 000 000 XOF',
+                          'mouvements': [
+                            {
+                              'date': '05 Oct 2023',
+                              'libelle': 'Achat Stock Mensuel',
+                              'montant': '4 000 000',
+                            },
+                          ],
+                        },
+                      ],
+                    );
+                  },
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

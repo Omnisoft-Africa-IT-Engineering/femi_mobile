@@ -7,7 +7,7 @@ import '../registre_journalier/registre_journalier_screen.dart';
 import '../subscription_pay/subscription_pay_screen.dart';
 import '../balance_generale/balance_generale_screen.dart';
 import '../balance_auxiliaire/balance_auxiliaire_screen.dart';
-
+import '../etat_financier/etat_financier_complet_screen.dart';
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -86,7 +86,7 @@ class _CompteScreenState extends State<CompteScreen> {
             isPro: isPro,
             onUpgradePressed: _naviguerVersAbonnement,
           ),
-          
+
           const SizedBox(height: 24),
           const Text('Documents Comptables', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
@@ -103,7 +103,7 @@ class _CompteScreenState extends State<CompteScreen> {
             title: 'État financier',
             isProFeature: true,
             isUserPro: isPro,
-            onTap: () => _ouvrirPageControle(EtatFinancierScreen(), true), // SANS const
+            onTap: () => _ouvrirPageControle(const EtatFinancierCompletScreen(), true),
           ),
           DocTile(
             icon: Icons.menu_book_outlined,
