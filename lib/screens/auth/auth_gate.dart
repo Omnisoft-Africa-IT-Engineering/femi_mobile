@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_state.dart';
-import '../auth/login_screen.dart';
+import '../onboarding/onboarding_welcome_screen.dart';
 import '../../main.dart' show MainNavigationScreen;
 
-/// Portail d'authentification : affiche automatiquement LoginScreen ou
-/// MainNavigationScreen selon AuthState.instance.isLoggedIn.
-///
-/// Ce widget écoute AuthState en temps réel : dès que login()/logout() est
-/// appelé quelque part dans l'app, l'écran affiché change automatiquement,
-/// sans navigation manuelle à gérer.
+/// Portail d'authentification : affiche automatiquement l'écran d'accueil
+/// (onboarding) ou MainNavigationScreen selon AuthState.instance.isLoggedIn.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -19,7 +15,7 @@ class AuthGate extends StatelessWidget {
       builder: (context, isLoggedIn, _) {
         return isLoggedIn
             ? const MainNavigationScreen()
-            : const LoginScreen();
+            : const OnboardingWelcomeScreen();
       },
     );
   }
