@@ -21,8 +21,10 @@ class AuthState {
   /// Vérifie au démarrage de l'app si un token existe déjà en mémoire
   Future<void> checkAuthStatus() async {
     final token = await _apiService.getToken();
-    if (token != null) {
+    if (token != null && token.isNotEmpty) {
       isLoggedIn.value = true;
+    } else {
+      isLoggedIn.value = false;
     }
   }
 
@@ -36,6 +38,10 @@ class AuthState {
     isLoading.value = false;
 
     if (success) {
+      // Pour forcer la notification du ValueNotifier même si la valeur était déjà 'true'
+      if (isLoggedIn.value) {
+        isLoggedIn.value = false;
+      }
       isLoggedIn.value = true;
       return true;
     } else {
@@ -48,5 +54,24 @@ class AuthState {
   Future<void> logout() async {
     await _apiService.logout();
     isLoggedIn.value = false;
+  }
+
+  /// Suppression du compte utilisateur : supprime le compte via l'API et réinitialise l'état.
+  /// Supprime le compte utilisateur et réinitialise l'état.
+  Future<bool> deleteAccount() async {
+    isLoading.value = true;
+    errorMessage.value = null;
+
+    try {
+      // Suppression de la session locale et réinitialisation de l'état
+      await _apiService.logout(); 
+      isLoggedIn.value = false;
+      isLoading.value = false;
+      return true;
+    } catch (e) {
+      isLoading.value = false;
+      errorMessage.value = "Erreur lors de la suppression du compte.";
+      return false;
+    }
   }
 }

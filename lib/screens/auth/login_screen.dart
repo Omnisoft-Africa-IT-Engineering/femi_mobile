@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../states/auth_state.dart';
+import '../auth/sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,7 +14,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // Palette reprise du reste de l'app (main.dart / dashboard)
+  // Palette entreprise / application Femi
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
@@ -26,7 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // --- Fonction privée de gestion de la connexion ---
   Future<void> _handleLogin() async {
     final username = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -41,10 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    // Appel asynchrone du service backend via AuthState
     final success = await AuthState.instance.login(username, password);
 
-    if (!success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -69,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 60),
 
-                // Logo / Icône de l'app
+                // Logo
                 Center(
                   child: Container(
                     width: 88,
@@ -172,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Bouton principal avec ValueListenableBuilder pour la charge
+                // Bouton principal - Se Connecter
                 ValueListenableBuilder<bool>(
                   valueListenable: AuthState.instance.isLoading,
                   builder: (context, isLoading, child) {
@@ -227,12 +232,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Bouton secondaire "Créer un compte"
+                // Bouton secondaire - Créer un compte
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SignUpScreen(),
+                        ),
+                      );
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: _darkGreen,
                       side: const BorderSide(color: _darkGreen, width: 1.2),

@@ -8,8 +8,8 @@ import '../subscription_pay/subscription_pay_screen.dart';
 import '../balance_generale/balance_generale_screen.dart';
 import '../balance_auxiliaire/balance_auxiliaire_screen.dart';
 import '../bilan/bilan_screen.dart';
-
-
+import '../faq/faq_screen.dart'; // Import de la FAQ
+import '../../states/auth_state.dart';
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -149,7 +149,7 @@ class _CompteScreenState extends State<CompteScreen> {
                 child: Icon(Icons.support_agent, color: Colors.white),
               ),
               title: const Text(
-                'Besoin d\'un diagnostic ?',
+                'FAQ et Diagnostic',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
               subtitle: const Text(
@@ -157,22 +157,98 @@ class _CompteScreenState extends State<CompteScreen> {
                 style: TextStyle(fontSize: 12),
               ),
               trailing: const Icon(Icons.chevron_right, color: Color(0xFF1B75BC)),
-              onTap: () {},
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const FaqScreen()),
+                );
+              },
             ),
           ),
 
           const Divider(height: 32),
 
           // Section 4: Actions de compte
+          // Bouton 1 : Se déconnecter
           ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Se déconnecter'),
-            onTap: () {},
+            leading: const Icon(Icons.logout, color: Color(0xFF2D3748)),
+            title: const Text(
+              'Se déconnecter',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF2D3748),
+              ),
+            ),
+            onTap: () => _showLogoutDialog(context),
           ),
+
+          const Divider(height: 1),
+
+          // Bouton 2 : Supprimer mon compte
           ListTile(
             leading: const Icon(Icons.delete_outline, color: Colors.red),
-            title: const Text('Supprimer mon compte', style: TextStyle(color: Colors.red)),
-            onTap: () {},
+            title: const Text(
+              'Supprimer mon compte',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: Colors.red,
+              ),
+            ),
+            onTap: () => _showDeleteAccountDialog(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Boîte de dialogue pour la déconnexion
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Déconnexion'),
+        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565D8)),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await AuthState.instance.logout();
+            },
+            child: const Text('Se déconnecter', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Boîte de dialogue pour la suppression
+  void _showDeleteAccountDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Supprimer mon compte'),
+        content: const Text(
+          'Cette action est irréversible. Voulez-vous vraiment supprimer votre compte ?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await AuthState.instance.deleteAccount();
+            },
+            child: const Text('Supprimer', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

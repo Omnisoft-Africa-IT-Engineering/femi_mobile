@@ -1,4 +1,3 @@
-//import 'package:femi_mobile/screens/auth/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
@@ -24,11 +23,9 @@ class FemiApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const AuthGate(),
-      // Configuration des routes de l'application
       routes: {
         '/subscription': (context) => const SubscriptionPayScreen(),
       },
-      // Gestion des arguments dynamiques (ex: targetFeature)
       onGenerateRoute: (settings) {
         if (settings.name == '/subscription') {
           final targetFeature = settings.arguments as String?;
