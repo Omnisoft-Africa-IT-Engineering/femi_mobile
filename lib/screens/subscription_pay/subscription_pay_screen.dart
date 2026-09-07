@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'widgets/payment_option_card_widget.dart';
 import 'widgets/plan_detail_card_widget.dart';
 import 'widgets/plan_tab_widget.dart';
+import 'widgets/mobile_money_bottom_sheet.dart';
+import '../../states/auth_state.dart';
 import 'widgets/target_feature_banner_widget.dart';
 
 class SubscriptionPayScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     {
       'title': 'Micro',
       'price': '10.99€',
+      'amountFcfa': 7200.0,
       'period': '/ mois',
       'description':
           'Idéal pour démarrer et gérer les flux quotidiens de votre activité.',
@@ -35,6 +38,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     {
       'title': 'Pro',
       'price': '20.99€',
+      'amountFcfa': 13750.0,
       'period': '/ mois',
       'description':
           'Pour piloter votre PME comme si vous aviez un comptable à temps plein.',
@@ -50,6 +54,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     {
       'title': 'Business',
       'price': '30.99€',
+      'amountFcfa': 20300.0,
       'period': '/ mois',
       'description':
           'Pour les structures multi-établissements avec accompagnement dédié.',
@@ -62,6 +67,52 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       'isPopular': false,
     },
   ];
+
+  // Gestion du paiement
+  // Gestion de la simulation de paiement
+  void _gererPaiement(Map<String, dynamic> selectedPlan) {
+    if (_selectedPaymentMethod == 0) {
+      // 1. MOBILE MONEY : Ouvrir le BottomSheet
+      MobileMoneyBottomSheet.show(
+        context: context,
+        initialPhoneNumber: '+22890000000', // Numéro par défaut
+        amount: selectedPlan['amountFcfa'] ?? 13750.0,
+        currency: 'FCFA',
+        onConfirmPayment: (phone, provider) async {
+          // 2. Afficher la boîte de dialogue d'attente / simulation PIN
+          USSDWaitingDialog.show(
+            context,
+            phoneNumber: phone,
+            provider: provider,
+          );
+
+          // 3. Simuler une attente de validation USSD de 2 secondes
+          await Future.delayed(const Duration(seconds: 2));
+
+          if (mounted) {
+            // 4. Fermer la boîte de dialogue USSD
+            Navigator.pop(context);
+
+            // 5. Mettre à jour l'état d'authentification pour connecter l'utilisateur
+            AuthState.instance.isLoggedIn.value = true;
+
+            // 6. Rediriger directement vers le Dashboard (en nettoyant tout l'historique de navigation)
+            Navigator.of(context).pushNamedAndRemoveUntil(
+              '/', // Redirige vers AuthGate qui basculera vers le Dashboard/MainNavigationScreen
+              (route) => false,
+            );
+          }
+        },
+      );
+    } else {
+      // 2. CARTE BANCAIRE (Simulation directe)
+      AuthState.instance.isLoggedIn.value = true;
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/',
+        (route) => false,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -191,9 +242,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pop(context, true);
-                  },
+                  onPressed: () => _gererPaiement(selectedPlan),
                   child: Text(
                     'Payer ${selectedPlan['price']} / mois',
                     style: const TextStyle(

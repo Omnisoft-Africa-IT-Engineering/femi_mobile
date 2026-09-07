@@ -61,6 +61,18 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // --- Handlers pour la connexion via Réseaux Sociaux ---
+  void _handleSocialLogin(String provider) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Connexion avec $provider en cours...'),
+        backgroundColor: _primaryBlue,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Connecter ici votre logique Google / Telegram / Apple OAuth
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -72,13 +84,13 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
 
                 // Logo
                 Center(
                   child: Container(
-                    width: 88,
-                    height: 88,
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
                       color: _accentTeal,
                       borderRadius: BorderRadius.circular(24),
@@ -86,11 +98,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Icon(
                       Icons.auto_awesome,
                       color: _darkGreen,
-                      size: 40,
+                      size: 38,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 const Center(
                   child: Text(
@@ -102,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Center(
                   child: Text(
                     'Connectez-vous pour accéder à votre compte',
@@ -113,7 +125,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
                 // Champ Identifiant / Email
                 const Text(
@@ -131,7 +143,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   icon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 // Champ Mot de passe
                 const Text(
@@ -175,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
                 // Bouton principal - Se Connecter
                 ValueListenableBuilder<bool>(
@@ -214,23 +226,56 @@ class _LoginScreenState extends State<LoginScreen> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                // Séparateur "ou"
+                // Séparateur "ou continuer avec"
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.grey[300])),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'ou',
+                        'ou continuer avec',
                         style: TextStyle(color: Colors.grey[500], fontSize: 13),
                       ),
                     ),
                     Expanded(child: Divider(color: Colors.grey[300])),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
+
+                // --- SECTION BOUTONS SOCIAUX (Google, Telegram, Apple) ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Google
+                    _buildSocialButton(
+                      label: 'Google',
+                      icon: Icons.g_mobiledata_rounded,
+                      iconColor: const Color(0xFFEA4335),
+                      onPressed: () => _handleSocialLogin('Google'),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Telegram
+                    _buildSocialButton(
+                      label: 'Telegram',
+                      icon: Icons.send_rounded,
+                      iconColor: const Color(0xFF0088CC),
+                      onPressed: () => _handleSocialLogin('Telegram'),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Apple
+                    _buildSocialButton(
+                      label: 'Apple',
+                      icon: Icons.apple_rounded,
+                      iconColor: Colors.black,
+                      onPressed: () => _handleSocialLogin('Apple'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
 
                 // Bouton secondaire - Créer un compte
                 SizedBox(
@@ -270,6 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // Widget helper pour les champs de saisie
   Widget _buildInputField({
     required TextEditingController controller,
     required String hint,
@@ -298,6 +344,51 @@ class _LoginScreenState extends State<LoginScreen> {
           border: InputBorder.none,
           contentPadding:
               const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+        ),
+      ),
+    );
+  }
+
+  // Widget helper pour les boutons des réseaux sociaux
+  Widget _buildSocialButton({
+    required String label,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onPressed,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08000000),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 24),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
