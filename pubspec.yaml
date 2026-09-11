@@ -19,7 +19,7 @@ dependencies:
   # Nouveaux packages ajoutés pour le Chat Femi (Audio, Images, Multipart)
   http_parser: ^4.0.2
   image_picker: ^1.1.0
-  record: ^5.1.0
+  record: ^7.1.1
   path_provider: ^2.1.2
 
 dev_dependencies:

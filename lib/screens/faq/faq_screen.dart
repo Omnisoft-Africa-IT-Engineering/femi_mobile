@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'widgets/faq_header.dart';
 import 'widgets/faq_card.dart';
 import 'widgets/faq_contact_card.dart';
+import '../femi_chat/femi_chat_screen.dart';
 
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
@@ -40,6 +41,14 @@ class FaqScreen extends StatelessWidget {
     },
   ];
 
+  // Ouvre l'écran de chat interne avec Femi.
+  void _ouvrirChatFemi(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FemiChatScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,9 +82,7 @@ class FaqScreen extends StatelessWidget {
 
               // Carte d'action bas de page
               FaqContactCard(
-                onPressed: () {
-                  // Action : Ouvrir WhatsApp ou le chat
-                },
+                onPressed: () => _ouvrirChatFemi(context),
               ),
 
               const SizedBox(height: 20),

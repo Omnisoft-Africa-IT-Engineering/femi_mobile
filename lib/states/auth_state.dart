@@ -12,6 +12,13 @@ class AuthState {
   /// false = utilisateur non connecté → afficher le LoginScreen
   final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
 
+  /// true = formule PRO active → débloque les fonctionnalités avancées.
+  /// État global, écouté par tous les écrans (ex: CompteScreen).
+  /// MODE TEST : passé à true directement par SubscriptionPayScreen,
+  /// sans appel API réel. TODO: brancher sur le vrai statut d'abonnement
+  /// renvoyé par le backend (via checkAuthStatus / login) avant la prod.
+  final ValueNotifier<bool> isPro = ValueNotifier<bool>(false);
+
   /// Indique si la requête de connexion réseau est en cours
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
 
@@ -26,6 +33,9 @@ class AuthState {
     } else {
       isLoggedIn.value = false;
     }
+    // TODO: quand le vrai système d'abonnement sera branché, récupérer ici
+    // le statut PRO persistant (ex: via _apiService ou SharedPreferences)
+    // et l'assigner à isPro.value, pour qu'il survive au redémarrage de l'app.
   }
 
   /// Connexion réelle au backend Django via l'API.
@@ -54,6 +64,7 @@ class AuthState {
   Future<void> logout() async {
     await _apiService.logout();
     isLoggedIn.value = false;
+    isPro.value = false;
   }
 
   /// Suppression du compte utilisateur : supprime le compte via l'API et réinitialise l'état.
@@ -64,8 +75,9 @@ class AuthState {
 
     try {
       // Suppression de la session locale et réinitialisation de l'état
-      await _apiService.logout(); 
+      await _apiService.logout();
       isLoggedIn.value = false;
+      isPro.value = false;
       isLoading.value = false;
       return true;
     } catch (e) {

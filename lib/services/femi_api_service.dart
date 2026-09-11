@@ -6,12 +6,10 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Service centralisant tous les appels vers le backend Django de Femi.
 class FemiApiService {
   // Utilisation du loopback local pour le dev Web (Chrome)
-  static const String baseUrl = 'http://127.0.0.1:8000/api/v1';
+  static const String baseUrl = 'https://shore-handiwork-croon.ngrok-free.dev/api/v1';
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // En-têtes HTTP requis pour communiquer avec Django
-  // NOTE : le backend utilise TokenAuthentication de Django REST Framework,
-  // pas du JWT — le préfixe attendu est donc "Token", pas "Bearer".
   Map<String, String> _buildHeaders([String? token]) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -37,8 +35,6 @@ class FemiApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
 
-        // On récupère le token (clé "token" pour TokenAuthentication DRF classique,
-        // avec repli sur "access"/"key" au cas où)
         final token = data['token'] ?? data['access'] ?? data['key'];
         if (token != null) {
           await _storage.write(key: 'auth_token', value: token.toString());
@@ -56,7 +52,7 @@ class FemiApiService {
     }
   }
 
-  // --- 2. Récupérer le nom de l'entreprise (Stockage local puis API) ---
+  // --- 2. Récupérer le nom de l'entreprise ---
   Future<String> getCompanyName() async {
     final localName = await _storage.read(key: 'company_name');
     if (localName != null && localName.isNotEmpty) {
@@ -156,7 +152,7 @@ class FemiApiService {
     }
   }
 
-  // --- 8. Obtenir l'historique d'une conversation avec l'Agent (GET /api/v1/agent/history/) ---
+  // --- 8. Obtenir l'historique d'une conversation avec l'Agent ---
   Future<List<dynamic>?> getChatHistory({String? conversationId}) async {
     final token = await getToken();
     if (token == null) return null;
@@ -185,6 +181,81 @@ class FemiApiService {
     } catch (e) {
       debugPrint('Erreur lors de la récupération de l\'historique du chat: $e');
       return null;
+    }
+  }
+
+  // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
+  Future<Map<String, dynamic>?> getRegistreJournalier({DateTime? date}) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    final jour = date ?? DateTime.now();
+    final dateStr =
+        '${jour.year.toString().padLeft(4, '0')}-${jour.month.toString().padLeft(2, '0')}-${jour.day.toString().padLeft(2, '0')}';
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/registre-journalier/?date=$dateStr'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération du registre journalier: $e');
+      return null;
+    }
+  }
+
+  // --- 10. Obtenir l'état financier simplifié (GET /api/v1/etat-financier/) ---
+  Future<Map<String, dynamic>?> getEtatFinancier() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/etat-financier/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de l\'état financier: $e');
+      return null;
+    }
+  }
+
+  // --- 11. Activer une formule d'abonnement (POST /api/v1/activate-plan/) ---
+  Future<bool> activatePlan({required String planTitle}) async {
+    final token = await getToken();
+    if (token == null) {
+      debugPrint('❌ Token d\'authentification introuvable.');
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/activate-plan/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'plan': planTitle,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        debugPrint('❌ Échec activation plan (${response.statusCode}): ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur réseau lors de l\'activation de la formule: $e');
+      return false;
     }
   }
 }

@@ -194,7 +194,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       });
     } catch (e) {
       final errorMessage = e.toString();
-      
+
       if (mounted) {
         // Détection explicite de l'erreur d'authentification 401
         if (errorMessage.contains('Authentication credentials were not provided') ||
@@ -284,18 +284,25 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=5'),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Femi',
-          style: TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
+        title: const Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=5'),
+            ),
+            SizedBox(width: 10),
+            Text(
+              'Femi',
+              style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(

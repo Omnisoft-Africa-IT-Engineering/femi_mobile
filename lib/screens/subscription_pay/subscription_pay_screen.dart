@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'widgets/payment_option_card_widget.dart';
 import 'widgets/plan_detail_card_widget.dart';
 import 'widgets/plan_tab_widget.dart';
-import 'widgets/mobile_money_bottom_sheet.dart';
 import '../../states/auth_state.dart';
 import 'widgets/target_feature_banner_widget.dart';
+
+// NOTE : FemiApiService n'est plus appelé pour l'instant (voir _gererPaiement).
+// Import conservé pour faciliter la réactivation future du paiement réel.
+import '../../services/femi_api_service.dart';
 
 class SubscriptionPayScreen extends StatefulWidget {
   final String? targetFeature;
@@ -18,6 +21,11 @@ class SubscriptionPayScreen extends StatefulWidget {
 class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
   int _selectedPlanIndex = 1; // 0: Micro, 1: Pro, 2: Business
   int _selectedPaymentMethod = 0; // 0: Mobile Money, 1: Carte bancaire
+  bool _isLoading = false;
+
+  // Instance conservée pour réactivation future de l'appel API réel.
+  // ignore: unused_field
+  final FemiApiService _apiService = FemiApiService();
 
   final List<Map<String, dynamic>> _plans = [
     {
@@ -68,50 +76,39 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     },
   ];
 
-  // Gestion du paiement
-  // Gestion de la simulation de paiement
-  void _gererPaiement(Map<String, dynamic> selectedPlan) {
-    if (_selectedPaymentMethod == 0) {
-      // 1. MOBILE MONEY : Ouvrir le BottomSheet
-      MobileMoneyBottomSheet.show(
-        context: context,
-        initialPhoneNumber: '+22890000000', // Numéro par défaut
-        amount: selectedPlan['amountFcfa'] ?? 13750.0,
-        currency: 'FCFA',
-        onConfirmPayment: (phone, provider) async {
-          // 2. Afficher la boîte de dialogue d'attente / simulation PIN
-          USSDWaitingDialog.show(
-            context,
-            phoneNumber: phone,
-            provider: provider,
-          );
+  // MODE TEST : déblocage instantané sans appel serveur.
+  // TODO: remettre l'appel réel à _apiService.activatePlan(...) avant la mise en prod,
+  // et faire dépendre AuthState.instance.isPro.value de la réponse réelle du backend.
+  Future<void> _gererPaiement(Map<String, dynamic> selectedPlan) async {
+    setState(() => _isLoading = true);
 
-          // 3. Simuler une attente de validation USSD de 2 secondes
-          await Future.delayed(const Duration(seconds: 2));
+    debugPrint('⚠️ MODE TEST : paiement désactivé, activation instantanée.');
 
-          if (mounted) {
-            // 4. Fermer la boîte de dialogue USSD
-            Navigator.pop(context);
+    // Petit délai pour garder le spinner visible un instant (UX).
+    await Future.delayed(const Duration(milliseconds: 500));
 
-            // 5. Mettre à jour l'état d'authentification pour connecter l'utilisateur
-            AuthState.instance.isLoggedIn.value = true;
+    if (!mounted) return;
 
-            // 6. Rediriger directement vers le Dashboard (en nettoyant tout l'historique de navigation)
-            Navigator.of(context).pushNamedAndRemoveUntil(
-              '/', // Redirige vers AuthGate qui basculera vers le Dashboard/MainNavigationScreen
-              (route) => false,
-            );
-          }
-        },
-      );
-    } else {
-      // 2. CARTE BANCAIRE (Simulation directe)
-      AuthState.instance.isLoggedIn.value = true;
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/',
-        (route) => false,
-      );
-    }
+    // Déblocage global immédiat : c'est CETTE ligne qui débloque réellement
+    // les fonctionnalités PRO partout dans l'app (CompteScreen inclus),
+    // car isPro est un état global écouté, pas une variable locale.
+    AuthState.instance.isPro.value = true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:
+            Text('Formule ${selectedPlan['title']} activée avec succès !'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+
+    // On repop simplement vers l'écran précédent (ex: CompteScreen),
+    // au lieu de vider toute la pile de navigation : plus besoin de
+    // renvoyer un résultat via Navigator.pop(true), l'état global suffit.
+    Navigator.of(context).pop(true);
+
+    setState(() => _isLoading = false);
   }
 
   @override
@@ -146,7 +143,6 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avertissement si verrouillage d'une fonctionnalité
                     if (widget.targetFeature != null)
                       TargetFeatureBannerWidget(
                         targetFeature: widget.targetFeature!,
@@ -176,7 +172,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                     PlanDetailCardWidget(plan: selectedPlan),
                     const SizedBox(height: 24),
 
-                    // 3. Méthodes de paiement
+                    // 3. Méthodes de paiement (visuelles)
                     const Text(
                       'Méthode de paiement',
                       style: TextStyle(
@@ -242,15 +238,26 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  onPressed: () => _gererPaiement(selectedPlan),
-                  child: Text(
-                    'Payer ${selectedPlan['price']} / mois',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _gererPaiement(selectedPlan),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : Text(
+                          'Activer la formule ${selectedPlan['title']} (${selectedPlan['price']})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ),

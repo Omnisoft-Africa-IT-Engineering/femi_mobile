@@ -5,16 +5,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class FemiAgentService {
-  /// Détection dynamique de l'URL de base selon la plateforme
-  static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api';
-    } else if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api';
-    } else {
-      return 'http://127.0.0.1:8000/api';
-    }
-  }
+  /// URL Ngrok unifiée pour la communication mobile et web
+  static const String baseUrl = 'https://shore-handiwork-croon.ngrok-free.dev/api';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
@@ -43,8 +35,7 @@ class FemiAgentService {
     Uint8List? imageBytes,
     Uint8List? audioBytes,
   }) async {
-    // URL corrigée : le segment "femi/" en trop a été retiré,
-    // pour correspondre à la vraie route Django : /api/v1/transactions/process/
+    // URL finale : https://shore-handiwork-croon.ngrok-free.dev/api/v1/transactions/process/
     final uri = Uri.parse('$baseUrl/v1/transactions/process/');
     var request = http.MultipartRequest('POST', uri);
 
