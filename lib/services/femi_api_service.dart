@@ -10,13 +10,14 @@ class FemiApiService {
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // En-têtes HTTP requis pour communiquer avec Django
+  // NOTE : le backend utilise TokenAuthentication de Django REST Framework,
+  // pas du JWT — le préfixe attendu est donc "Token", pas "Bearer".
   Map<String, String> _buildHeaders([String? token]) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
     if (token != null) {
-      // simple-jwt utilise 'Bearer <token>'
-      headers['Authorization'] = 'Bearer $token';
+      headers['Authorization'] = 'Token $token';
     }
     return headers;
   }
@@ -35,13 +36,13 @@ class FemiApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        
-        // On récupère le token d'accès JWT
-        final token = data['access'] ?? data['token'] ?? data['key'];
+
+        // On récupère le token (clé "token" pour TokenAuthentication DRF classique,
+        // avec repli sur "access"/"key" au cas où)
+        final token = data['token'] ?? data['access'] ?? data['key'];
         if (token != null) {
           await _storage.write(key: 'auth_token', value: token.toString());
 
-          // Sauvegarde du nom de l'entreprise ou de l'utilisateur si renvoyé par le backend
           final companyName = data['company_name'] ?? data['username'] ?? username;
           await _storage.write(key: 'company_name', value: companyName.toString());
 
@@ -57,13 +58,11 @@ class FemiApiService {
 
   // --- 2. Récupérer le nom de l'entreprise (Stockage local puis API) ---
   Future<String> getCompanyName() async {
-    // 1. Essai de lecture locale rapide
     final localName = await _storage.read(key: 'company_name');
     if (localName != null && localName.isNotEmpty) {
       return localName;
     }
 
-    // 2. Si non trouvé localement, interrogation du profil sur l'API
     final profile = await getUserProfile();
     if (profile != null) {
       final name = profile['company_name'] ?? profile['username'] ?? 'Mon Entreprise';

@@ -1,108 +1,122 @@
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../models/femi_agent_models.dart';
+import 'package:http/http.dart' as http;
 
 class FemiAgentService {
-  // URL avec le préfixe /api/v1 aligned sur Django
+  /// Détection dynamique de l'URL de base selon la plateforme
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:8000/api/v1';
-    } else if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000/api/v1';
+      return 'http://127.0.0.1:8000/api';
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000/api';
     } else {
-      return 'http://localhost:8000/api/v1';
+      return 'http://127.0.0.1:8000/api';
     }
   }
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  /// Envoie un message texte, un fichier audio ou une image à l'Agent Femi
-  Future<FemiAgentResponse> sendMessage({
+  /// Alias pour assurer la rétrocompatibilité avec `femi_chat_screen.dart`
+  Future<Map<String, dynamic>> sendMessage({
     String? text,
-    File? audioFile,
-    File? imageFile,
+    dynamic audioFile,
+    dynamic imageFile,
+    Uint8List? imageBytes,
+    Uint8List? audioBytes,
   }) async {
-    // Route alignée sur apps.femi_api.urls
-    final url = Uri.parse('$baseUrl/transactions/process/');
-    var request = http.MultipartRequest('POST', url);
+    return processTransaction(
+      text: text,
+      audioFile: audioFile,
+      imageFile: imageFile,
+      imageBytes: imageBytes,
+      audioBytes: audioBytes,
+    );
+  }
 
-    // 1. Récupération du Token JWT
-    final token = await _storage.read(key: 'access_token');
-    if (token != null) {
-      request.headers['Authorization'] = 'Bearer $token';
+  /// Envoie un message texte, une image ou un fichier vocal à l'agent Femi.
+  Future<Map<String, dynamic>> processTransaction({
+    String? text,
+    dynamic audioFile,
+    dynamic imageFile,
+    Uint8List? imageBytes,
+    Uint8List? audioBytes,
+  }) async {
+    // URL corrigée : le segment "femi/" en trop a été retiré,
+    // pour correspondre à la vraie route Django : /api/v1/transactions/process/
+    final uri = Uri.parse('$baseUrl/v1/transactions/process/');
+    var request = http.MultipartRequest('POST', uri);
+
+    // 1. Récupération et nettoyage du Token d'authentification
+    String? token = await _storage.read(key: 'auth_token') ??
+        await _storage.read(key: 'token') ??
+        await _storage.read(key: 'access_token');
+
+    if (token != null && token.isNotEmpty) {
+      final cleanToken = token.replaceAll('"', '').trim();
+      request.headers['Authorization'] = 'Token $cleanToken';
+      debugPrint('🔑 Token envoyé avec succès : Token $cleanToken');
+    } else {
+      throw Exception(
+        'Aucun jeton d\'authentification trouvé. Veuillez vous reconnecter.',
+      );
     }
 
-    // 2. Envoi du texte sous les 2 clés (text et text_input) pour compatibilité
-    final cleanText = text?.trim() ?? '';
-    request.fields['text'] = cleanText;
-    request.fields['text_input'] = cleanText;
+    // 2. Ajout du texte si disponible
+    if (text != null && text.trim().isNotEmpty) {
+      request.fields['text'] = text.trim();
+    }
 
-    // 3. Ajout du fichier audio si présent
-    if (audioFile != null && await audioFile.exists()) {
+    // 3. Ajout du fichier audio (Compatible Web & Mobile)
+    if (kIsWeb && audioBytes != null) {
       request.files.add(
-        await http.MultipartFile.fromPath(
+        http.MultipartFile.fromBytes(
           'audio',
-          audioFile.path,
-          contentType: MediaType('audio', 'm4a'),
+          audioBytes,
+          filename: 'vocal.m4a',
         ),
       );
+    } else if (!kIsWeb && audioFile != null) {
+      if (audioFile is io.File && await audioFile.exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath('audio', audioFile.path),
+        );
+      }
     }
 
-    // 4. Ajout du fichier image si présent (Reçu / Facture)
-    if (imageFile != null && await imageFile.exists()) {
-      String extension = imageFile.path.split('.').last.toLowerCase();
-      if (extension == 'jpg') extension = 'jpeg';
-
+    // 4. Ajout de l'image (Compatible Web & Mobile)
+    if (kIsWeb && imageBytes != null) {
       request.files.add(
-        await http.MultipartFile.fromPath(
+        http.MultipartFile.fromBytes(
           'image',
-          imageFile.path,
-          contentType: MediaType('image', extension),
+          imageBytes,
+          filename: 'upload.jpg',
         ),
       );
+    } else if (!kIsWeb && imageFile != null) {
+      if (imageFile is io.File && await imageFile.exists()) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imageFile.path),
+        );
+      }
     }
 
+    // 5. Envoi de la requête multipart
     try {
-      // 5. Envoi de la requête au backend Python
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      final responseText = utf8.decode(response.bodyBytes);
-      final contentType = response.headers['content-type'] ?? '';
-
-      // Vérification si la réponse est du JSON
-      if (contentType.contains('application/json')) {
-        final Map<String, dynamic> responseData = jsonDecode(responseText);
-
-        if (response.statusCode == 200) {
-          return FemiAgentResponse(
-            statusCode: 200,
-            message: responseData['message'] ?? 'Réponse reçue.',
-          );
-        } else if (response.statusCode == 201) {
-          final transaction = FemiTransaction.fromJson(responseData);
-          return FemiAgentResponse(
-            statusCode: 201,
-            message: 'Transaction enregistrée avec succès.',
-            transaction: transaction,
-          );
-        } else {
-          throw Exception(
-            responseData['error'] ??
-                responseData['detail'] ??
-                responseData['message'] ??
-                'Erreur lors du traitement (${response.statusCode})',
-          );
-        }
-      } else {
-        print('--- ERREUR SERVEUR BRUTE (${response.statusCode}) ---');
-        print(responseText);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decodedData = jsonDecode(utf8.decode(response.bodyBytes));
+        return decodedData as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
         throw Exception(
-          'Erreur serveur (${response.statusCode}). Regardez le terminal Django pour voir le détail.',
+          'Erreur 401 : Session expirée ou Token invalide. Veuillez vous reconnecter.',
+        );
+      } else {
+        throw Exception(
+          'Erreur serveur (${response.statusCode}) : ${response.body}',
         );
       }
     } catch (e) {

@@ -69,6 +69,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return '${numValue.toStringAsFixed(1)}%';
   }
 
+  String _formatTrend(dynamic value) {
+    if (value == null) return '';
+    final double numValue = (value is num) ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final String sign = numValue >= 0 ? '+' : '';
+    return '$sign${numValue.toStringAsFixed(1)}% vs période préc.';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,6 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const Icon(Icons.error_outline, color: Colors.red, size: 48),
                     const SizedBox(height: 8),
                     const Text('Erreur de chargement des données'),
+                    const SizedBox(height: 8),
                     ElevatedButton(
                       onPressed: _refreshData,
                       child: const Text('Réessayer'),
@@ -131,45 +139,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
             }
 
             final responseData = snapshot.data ?? {};
-            final kpis = responseData.containsKey('kpis')
-                ? responseData['kpis'] as Map<String, dynamic>
-                : responseData;
+
+            // --- Extrapolation des blocs du Backend ---
+            final Map<String, dynamic> kpis = (responseData['kpis'] as Map<String, dynamic>?) ?? {};
+            final Map<String, dynamic> treasury = (responseData['treasury'] as Map<String, dynamic>?) ?? {};
+            final Map<String, dynamic> trends = (responseData['trends'] as Map<String, dynamic>?) ?? {};
+            final Map<String, dynamic> operations = (responseData['operations'] as Map<String, dynamic>?) ?? {};
+            final Map<String, dynamic> aiInsights = (responseData['ai_insights'] as Map<String, dynamic>?) ?? {};
 
             // --- NIVEAU 1 : Santé ---
-            final String revenue = _formatCompactAmount(kpis['total_revenue'] ?? kpis['chiffre_affaires']);
-            final String netIncome = _formatCompactAmount(kpis['net_profit'] ?? kpis['resultat_net']);
-            final String expenses = _formatCompactAmount(kpis['total_expenses'] ?? kpis['depenses']);
-            final String cashFlow = _formatCompactAmount(kpis['cash_flow'] ?? kpis['tresorerie']);
-            final String activeClientsCount = (kpis['active_clients_count'] ?? kpis['clients'] ?? 0).toString();
-            final String totalReceivables = _formatCompactAmount(kpis['total_receivables'] ?? kpis['creances']);
+            final String revenue = _formatCompactAmount(kpis['total_revenue']);
+            final String netIncome = _formatCompactAmount(kpis['net_profit']);
+            final String expenses = _formatCompactAmount(kpis['total_expenses']);
+            final String cashFlow = _formatCompactAmount(treasury['balance']);
+            final String activeClientsCount = (kpis['unique_clients_count'] ?? 0).toString();
+            final String totalReceivables = _formatCompactAmount(kpis['total_receivables']);
+
+            final String revenueChange = _formatTrend(trends['revenue_change_percentage']);
+            final String expensesChange = _formatTrend(trends['expenses_change_percentage']);
+            final String profitChange = _formatTrend(trends['profit_change_percentage']);
 
             // --- NIVEAU 2 : Activité ---
-            final String salesCount = (kpis['sales_count'] ?? kpis['ventes'] ?? 0).toString();
-            final String pendingOrdersCount = (kpis['pending_orders_count'] ?? kpis['commandes'] ?? 0).toString();
-            final String averageBasket = _formatCompactAmount(kpis['average_basket'] ?? kpis['panier_moyen']);
-            final String totalProducts = (kpis['total_products_count'] ?? kpis['produits'] ?? 0).toString();
+            final String salesCount = (kpis['total_transactions_count'] ?? 0).toString();
+            final String averageBasket = _formatCompactAmount(kpis['average_sale_amount']);
+            final String pendingOrdersCount = (kpis['pending_orders_count'] ?? 0).toString();
+            final String totalProducts = (kpis['total_products_count'] ?? 0).toString();
             final String recurringClientsCount = (kpis['recurring_clients_count'] ?? 0).toString();
-            final String servicesCount = (kpis['completed_services_count'] ?? kpis['prestations'] ?? 0).toString();
+            final String servicesCount = (kpis['services_count'] ?? 0).toString();
 
             // --- NIVEAU 3 : Finance ---
-            final String marginRate = _formatPercentage(kpis['profit_margin_percentage'] ?? kpis['taux_marge']);
-            final String totalDebts = _formatCompactAmount(kpis['total_debts'] ?? kpis['dettes']);
+            final String marginRate = _formatPercentage(kpis['profit_margin_percentage']);
+            final String totalDebts = _formatCompactAmount(kpis['total_debts']);
 
             // --- NIVEAU 4 : Opérations ---
-            final String stockStatus = _formatPercentage(kpis['stock_status'] ?? 85);
-            final String suppliersCount = (kpis['suppliers_count'] ?? kpis['fournisseurs'] ?? 0).toString();
-            final String productionRate = _formatPercentage(kpis['production_rate'] ?? 92);
-            final String totalPurchases = _formatCompactAmount(kpis['total_purchases'] ?? kpis['achats']);
-            final String deliveriesCount = (kpis['deliveries_count'] ?? kpis['livraisons'] ?? 0).toString();
-            final String staffCount = (kpis['staff_count'] ?? '8/8').toString();
+            final String stockStatus = _formatPercentage(operations['stock_status_percentage']);
+            final String suppliersCount = (operations['suppliers_count'] ?? 0).toString();
+            final String productionRate = _formatPercentage(operations['production_rate_percentage']);
+            final String totalPurchases = _formatCompactAmount(operations['total_purchases']);
+            final String deliveriesCount = (operations['deliveries_count'] ?? 0).toString();
+            final String staffCount = (operations['staff_count'] ?? '-').toString();
 
             // --- NIVEAU 5 : IA ---
-            final String anomaliesCount = (kpis['anomalies_count'] ?? 1).toString();
-            final String trendPercentage = _formatPercentage(kpis['sales_trend_percentage'] ?? 15);
-            final String growthForecast = _formatPercentage(kpis['growth_forecast_percentage'] ?? 5);
-            final String alertsCount = (kpis['alerts_count'] ?? 2).toString();
-            final String recommendationsCount = (kpis['recommendations_count'] ?? 3).toString();
-            final String opportunitiesCount = (kpis['opportunities_count'] ?? 12).toString();
+            final String anomaliesCount = (aiInsights['anomalies_count'] ?? 0).toString();
+            final String trendPercentage = _formatPercentage(aiInsights['trend_percentage']);
+            final String growthForecast = _formatPercentage(aiInsights['growth_forecast']);
+            final String alertsCount = (aiInsights['alerts_count'] ?? 0).toString();
+            final String recommendationsCount = (aiInsights['recommendations_count'] ?? 0).toString();
+            final String opportunitiesCount = (aiInsights['opportunities_count'] ?? 0).toString();
 
             return SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -177,60 +193,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const AiSummaryCardWidget(
+                  AiSummaryCardWidget(
                     message:
-                        'Le chiffre d\'affaires est en hausse ce mois-ci. Données synchronisées avec le serveur Django.',
+                        'Chiffre d\'affaires : $revenue ce mois-ci ($revenueChange). '
+                        'Dépenses : $expenses ($expensesChange).',
                   ),
                   const SizedBox(height: 20),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Santé de l\'entreprise',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      RichText(
-                        text: TextSpan(
-                          text: 'Score global: ',
-                          style: const TextStyle(color: Colors.black54, fontSize: 14),
-                          children: [
-                            TextSpan(
-                              text: '${kpis['health_score'] ?? 78}/100',
-                              style: const TextStyle(
-                                color: Color(0xFF0E7A63),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  const Text(
+                    'Santé de l\'entreprise',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const SizedBox(height: 16),
 
-                  _buildLevelHeader('Niveau 1 — Santé (6 KPI)'),
+                  _buildLevelHeader('Niveau 1 — Santé'),
                   _buildHorizontalScrollRow([
                     MetricCardWidget(
                       title: 'CHIFFRE D\'AFFAIRES',
                       value: revenue,
                       icon: Icons.payments,
                       color: Colors.green,
-                      subtitle: '+12% vs mois pr',
+                      subtitle: revenueChange,
                     ),
                     MetricCardWidget(
                       title: 'BÉNÉFICE NET',
                       value: netIncome,
                       icon: Icons.trending_up,
                       color: Colors.green,
-                      subtitle: '+5% vs mois pre',
+                      subtitle: profitChange,
                     ),
                     MetricCardWidget(
                       title: 'DÉPENSES',
                       value: expenses,
                       icon: Icons.shopping_bag,
                       color: Colors.red,
-                      subtitle: '+8% vs mois',
+                      subtitle: expensesChange,
                     ),
                     MetricCardWidget(
                       title: 'TRÉSORERIE',
@@ -244,14 +241,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       value: activeClientsCount,
                       icon: Icons.people,
                       color: Colors.green,
-                      subtitle: '+4 ce mois',
+                      subtitle: 'Ce mois',
                     ),
                     MetricCardWidget(
                       title: 'CRÉANCES',
                       value: totalReceivables,
                       icon: Icons.warning_amber_rounded,
                       color: Colors.red,
-                      subtitle: '${kpis['overdue_receivables_count'] ?? 3} retards',
+                      subtitle: 'À recouvrir',
                     ),
                   ]),
                   const SizedBox(height: 16),
@@ -259,46 +256,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildLevelHeader('Niveau 2 — Activité'),
                   _buildHorizontalScrollRow([
                     MetricCardWidget(
-                      title: 'VENTES',
+                      title: 'TRANSACTIONS',
                       value: salesCount,
                       icon: Icons.point_of_sale,
                       color: Colors.green,
-                      subtitle: '+18% ce mois',
+                      subtitle: 'Ce mois',
                     ),
                     MetricCardWidget(
                       title: 'COMMANDES',
                       value: pendingOrdersCount,
                       icon: Icons.receipt_long,
                       color: const Color(0xFF1B75BC),
-                      subtitle: '8 en cours',
                     ),
                     MetricCardWidget(
                       title: 'PANIER MOYEN',
                       value: averageBasket,
                       icon: Icons.shopping_cart,
                       color: Colors.green,
-                      subtitle: '+2.4%',
                     ),
                     MetricCardWidget(
                       title: 'PRODUITS',
                       value: totalProducts,
                       icon: Icons.inventory_2,
                       color: Colors.grey,
-                      subtitle: 'En catalogue',
                     ),
                     MetricCardWidget(
                       title: 'CLIENTS ACTIFS',
                       value: recurringClientsCount,
                       icon: Icons.person_pin,
                       color: Colors.green,
-                      subtitle: 'Récurrents 65%',
                     ),
                     MetricCardWidget(
                       title: 'PRESTATIONS',
                       value: servicesCount,
                       icon: Icons.build,
                       color: const Color(0xFF1B75BC),
-                      subtitle: 'Achevées',
                     ),
                   ]),
                   const SizedBox(height: 16),
@@ -310,144 +302,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       value: revenue,
                       icon: Icons.attach_money,
                       color: Colors.green,
-                      subtitle: 'Mois en cours',
                     ),
                     MetricCardWidget(
                       title: 'DÉPENSES',
                       value: expenses,
                       icon: Icons.money_off,
                       color: Colors.red,
-                      subtitle: 'Opérationnel',
                     ),
                     MetricCardWidget(
-                      title: 'MARGE BRUTE',
+                      title: 'MARGE',
                       value: marginRate,
                       icon: Icons.pie_chart,
                       color: Colors.orange,
-                      subtitle: 'Cible: 25%',
                     ),
                     MetricCardWidget(
                       title: 'BÉNÉFICE',
                       value: netIncome,
                       icon: Icons.show_chart,
                       color: Colors.green,
-                      subtitle: 'Avant impôt',
                     ),
                     MetricCardWidget(
                       title: 'TRÉSORERIE',
                       value: cashFlow,
                       icon: Icons.account_balance_wallet,
                       color: const Color(0xFF1B75BC),
-                      subtitle: 'En banque',
                     ),
                     MetricCardWidget(
                       title: 'DETTES',
                       value: totalDebts,
                       icon: Icons.credit_card_off,
                       color: Colors.red,
-                      subtitle: 'Échéance < 30j',
-                    ),
-                    MetricCardWidget(
-                      title: 'CRÉANCES',
-                      value: totalReceivables,
-                      icon: Icons.request_quote,
-                      color: Colors.orange,
-                      subtitle: 'À recouvrir',
                     ),
                   ]),
                   const SizedBox(height: 16),
 
                   _buildLevelHeader('Niveau 4 — Opérations'),
                   _buildHorizontalScrollRow([
-                    MetricCardWidget(
-                      title: 'STOCKS',
-                      value: stockStatus,
-                      icon: Icons.store,
-                      color: Colors.orange,
-                      subtitle: '2 alerte stock',
-                    ),
-                    MetricCardWidget(
-                      title: 'FOURNISSEURS',
-                      value: suppliersCount,
-                      icon: Icons.local_shipping,
-                      color: Colors.grey,
-                      subtitle: 'Actifs',
-                    ),
-                    MetricCardWidget(
-                      title: 'PRODUCTION',
-                      value: productionRate,
-                      icon: Icons.precision_manufacturing,
-                      color: Colors.green,
-                      subtitle: 'Rendement',
-                    ),
-                    MetricCardWidget(
-                      title: 'ACHATS',
-                      value: totalPurchases,
-                      icon: Icons.add_shopping_cart,
-                      color: Colors.red,
-                      subtitle: 'Ce mois',
-                    ),
-                    MetricCardWidget(
-                      title: 'LIVRAISONS',
-                      value: deliveriesCount,
-                      icon: Icons.delivery_dining,
-                      color: Colors.orange,
-                      subtitle: '1 en retard',
-                    ),
-                    MetricCardWidget(
-                      title: 'PERSONNEL',
-                      value: staffCount,
-                      icon: Icons.badge,
-                      color: Colors.green,
-                      subtitle: 'Présents',
-                    ),
+                    MetricCardWidget(title: 'STOCKS', value: stockStatus, icon: Icons.store, color: Colors.orange),
+                    MetricCardWidget(title: 'FOURNISSEURS', value: suppliersCount, icon: Icons.local_shipping, color: Colors.grey),
+                    MetricCardWidget(title: 'PRODUCTION', value: productionRate, icon: Icons.precision_manufacturing, color: Colors.green),
+                    MetricCardWidget(title: 'ACHATS', value: totalPurchases, icon: Icons.add_shopping_cart, color: Colors.red),
+                    MetricCardWidget(title: 'LIVRAISONS', value: deliveriesCount, icon: Icons.delivery_dining, color: Colors.orange),
+                    MetricCardWidget(title: 'PERSONNEL', value: staffCount, icon: Icons.badge, color: Colors.green),
                   ]),
                   const SizedBox(height: 16),
 
                   _buildLevelHeader('Niveau 5 — Intelligence IA'),
                   _buildHorizontalScrollRow([
-                    MetricCardWidget(
-                      title: 'ANOMALIES',
-                      value: anomaliesCount,
-                      icon: Icons.error_outline,
-                      color: Colors.red,
-                      subtitle: 'Frais transport',
-                    ),
-                    MetricCardWidget(
-                      title: 'TENDANCES',
-                      value: trendPercentage,
-                      icon: Icons.auto_graph,
-                      color: Colors.green,
-                      subtitle: 'Service Pro',
-                    ),
-                    MetricCardWidget(
-                      title: 'PRÉVISIONS',
-                      value: growthForecast,
-                      icon: Icons.insights,
-                      color: const Color(0xFF1B75BC),
-                      subtitle: 'Croissance T4',
-                    ),
-                    MetricCardWidget(
-                      title: 'ALERTES',
-                      value: alertsCount,
-                      icon: Icons.add_alert,
-                      color: Colors.orange,
-                      subtitle: 'Trésorerie/Stock',
-                    ),
-                    MetricCardWidget(
-                      title: 'RECOMMAND.',
-                      value: recommendationsCount,
-                      icon: Icons.psychology,
-                      color: const Color(0xFF1B75BC),
-                      subtitle: 'Actions dispo',
-                    ),
-                    MetricCardWidget(
-                      title: 'OPPORTUNITÉS',
-                      value: opportunitiesCount,
-                      icon: Icons.lightbulb_outline,
-                      color: Colors.green,
-                      subtitle: 'Clients fidèles',
-                    ),
+                    MetricCardWidget(title: 'ANOMALIES', value: anomaliesCount, icon: Icons.error_outline, color: Colors.red),
+                    MetricCardWidget(title: 'TENDANCES', value: trendPercentage, icon: Icons.auto_graph, color: Colors.green),
+                    MetricCardWidget(title: 'PRÉVISIONS', value: growthForecast, icon: Icons.insights, color: const Color(0xFF1B75BC)),
+                    MetricCardWidget(title: 'ALERTES', value: alertsCount, icon: Icons.add_alert, color: Colors.orange),
+                    MetricCardWidget(title: 'RECOMMAND.', value: recommendationsCount, icon: Icons.psychology, color: const Color(0xFF1B75BC)),
+                    MetricCardWidget(title: 'OPPORTUNITÉS', value: opportunitiesCount, icon: Icons.lightbulb_outline, color: Colors.green),
                   ]),
                   const SizedBox(height: 24),
 
@@ -458,9 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       prefixIcon: const Icon(Icons.search, color: Color(0xFF1B75BC)),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.send, color: Color(0xFF1B75BC)),
-                        onPressed: () {
-                          // Traiter la soumission de la question
-                        },
+                        onPressed: () {},
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -479,37 +384,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
                   const Text(
                     'Questions suggérées :',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.black87,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.black87),
                   ),
                   const SizedBox(height: 8),
 
-                  _buildSuggestedQuestion(
-                    icon: Icons.analytics_outlined,
-                    title: "Analyse de la rentabilité par produit/service",
-                  ),
-                  _buildSuggestedQuestion(
-                    icon: Icons.account_balance_wallet_outlined,
-                    title: "Où va l'argent ? (Analyse des charges)",
-                  ),
-                  _buildSuggestedQuestion(
-                    icon: Icons.people_outline,
-                    title: "Qui relancer ce mois-ci ? (Créances)",
-                  ),
-                  _buildSuggestedQuestion(
-                    icon: Icons.trending_up_outlined,
-                    title: "Prévisions financières pour les 3 prochains mois",
-                  ),
+                  _buildSuggestedQuestion(icon: Icons.analytics_outlined, title: "Analyse de la rentabilité par produit/service"),
+                  _buildSuggestedQuestion(icon: Icons.account_balance_wallet_outlined, title: "Où va l'argent ? (Analyse des charges)"),
+                  _buildSuggestedQuestion(icon: Icons.people_outline, title: "Qui relancer ce mois-ci ? (Créances)"),
+                  _buildSuggestedQuestion(icon: Icons.trending_up_outlined, title: "Prévisions financières pour les 3 prochains mois"),
 
                   const SizedBox(height: 20),
 
-                  const AiRecommendationCardWidget(
-                    description:
-                        'Pour améliorer votre trésorerie immédiate, nous vous suggérons de relancer la facture #INV-2023-042 (Client: TechCorp) d\'un montant de 1.2M FCFA, en retard de 15 jours.',
-                  ),
+                  if (kpis.isNotEmpty)
+                    AiRecommendationCardWidget(
+                      description:
+                          'Chiffre d\'affaires de $revenue ce mois-ci, dépenses de $expenses. '
+                          'Marge actuelle : $marginRate.',
+                    ),
                 ],
               ),
             );
@@ -541,10 +432,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildSuggestedQuestion({
-    required IconData icon,
-    required String title,
-  }) {
+  Widget _buildSuggestedQuestion({required IconData icon, required String title}) {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
@@ -555,15 +443,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: ListTile(
         dense: true,
         leading: Icon(icon, color: const Color(0xFF1B75BC), size: 20),
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios,
-          size: 14,
-          color: Colors.grey,
-        ),
+        title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
         onTap: () {
           _queryController.text = title;
         },
