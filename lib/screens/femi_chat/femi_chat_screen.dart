@@ -5,12 +5,24 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import '../../services/femi_agent_service.dart';
+import 'widgets/continuer_sur_whatsapp_banner.dart';
 import 'widgets/chat_date_badge_widget.dart';
 import 'widgets/chat_input_bar_widget.dart';
 import 'widgets/chat_message_bubble_widget.dart';
 
 class FemiChatScreen extends StatefulWidget {
-  const FemiChatScreen({super.key});
+  /// Message à envoyer automatiquement à l'agent dès l'ouverture/mise à
+  /// jour de l'écran (ex. déclenché par "Agir maintenant" sur le
+  /// Dashboard). Null ou vide = comportement normal, rien n'est envoyé.
+  final String? initialPrompt;
+
+  /// Change à chaque nouvelle demande d'envoi automatique, même si le
+  /// texte du prompt est identique à la fois précédente. Comme cet
+  /// écran reste vivant dans un IndexedStack, c'est ce compteur (via
+  /// didUpdateWidget) qui permet de détecter une nouvelle demande.
+  final int promptNonce;
+
+  const FemiChatScreen({super.key, this.initialPrompt, this.promptNonce = 0});
 
   @override
   State<FemiChatScreen> createState() => _FemiChatScreenState();
@@ -28,6 +40,11 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   bool _isRecording = false;
   File? _selectedImage;
 
+  // Dernier promptNonce déjà traité, pour ne pas renvoyer deux fois le
+  // même message (ex. lors d'un rebuild qui ne vient pas d'une nouvelle
+  // demande de bascule).
+  int? _handledPromptNonce;
+
   final List<Map<String, dynamic>> _messages = [
     {
       'text': 'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
@@ -40,6 +57,29 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   void initState() {
     super.initState();
     _checkAuthenticationStatus();
+    _maybeSendInitialPrompt();
+  }
+
+  @override
+  void didUpdateWidget(covariant FemiChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _maybeSendInitialPrompt();
+  }
+
+  void _maybeSendInitialPrompt() {
+    final prompt = widget.initialPrompt;
+    if (prompt == null || prompt.trim().isEmpty) return;
+    if (_handledPromptNonce == widget.promptNonce) return;
+
+    _handledPromptNonce = widget.promptNonce;
+
+    // On attend la fin du build en cours avant d'envoyer, pour être sûr
+    // que le widget est bien monté (setState dans _sendMessage).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _messageController.text = prompt;
+      _sendMessage();
+    });
   }
 
   /// Vérifie si un token JWT/DRF valide est stocké au chargement de l'écran
@@ -344,6 +384,10 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
           // Aperçu de l'image si sélectionnée
           if (_selectedImage != null) _buildSelectedImagePreview(),
+
+          // Bandeau "Continuer sur WhatsApp" — juste au-dessus de la
+          // barre de saisie, donc toujours visible même clavier ouvert.
+          const ContinuerSurWhatsappBanner(),
 
           // Barre de saisie
           Padding(

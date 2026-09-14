@@ -13,6 +13,11 @@ class FemiApiService {
   Map<String, String> _buildHeaders([String? token]) {
     final headers = <String, String>{
       'Content-Type': 'application/json',
+      // Indispensable en Flutter Web : sans ce header, ngrok (offre
+      // gratuite) intercepte la requête avec sa page d'avertissement
+      // HTML au lieu de la transmettre à Django — cette page n'a pas
+      // d'en-têtes CORS, ce qui bloque la requête côté navigateur.
+      'ngrok-skip-browser-warning': 'true',
     };
     if (token != null) {
       headers['Authorization'] = 'Token $token';
@@ -39,7 +44,10 @@ class FemiApiService {
         if (token != null) {
           await _storage.write(key: 'auth_token', value: token.toString());
 
-          final companyName = data['company_name'] ?? data['username'] ?? username;
+          // Django (LoginAPIView) renvoie "entreprise_nom", pas
+          // "company_name" — avec l'ancien champ, ça retombait toujours
+          // sur le username au lieu du vrai nom de l'entreprise.
+          final companyName = data['entreprise_nom'] ?? data['company_name'] ?? data['username'] ?? username;
           await _storage.write(key: 'company_name', value: companyName.toString());
 
           return true;
@@ -48,6 +56,58 @@ class FemiApiService {
       return false;
     } catch (e) {
       debugPrint('Erreur lors du login: $e');
+      return false;
+    }
+  }
+
+  // --- 1bis. Inscription (POST /api/v1/auth/register/) ---
+  // Crée l'Entreprise + l'Utilisateur, stocke le token comme login().
+  Future<bool> register({
+    required String username,
+    required String password,
+    required String nomEntreprise,
+    String? nomComplet,
+    String? email,
+    String? telephoneWhatsapp,
+    String? secteurNom,
+    String? devise,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/register/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'nom_entreprise': nomEntreprise,
+          if (nomComplet != null && nomComplet.isNotEmpty) 'nom_complet': nomComplet,
+          if (email != null && email.isNotEmpty) 'email': email,
+          if (telephoneWhatsapp != null && telephoneWhatsapp.isNotEmpty)
+            'telephone_whatsapp': telephoneWhatsapp,
+          if (secteurNom != null && secteurNom.isNotEmpty) 'secteur_nom': secteurNom,
+          if (devise != null && devise.isNotEmpty) 'devise': devise,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+
+        final token = data['token'];
+        if (token != null) {
+          await _storage.write(key: 'auth_token', value: token.toString());
+
+          final companyName = data['entreprise_nom'] ?? nomEntreprise;
+          await _storage.write(key: 'company_name', value: companyName.toString());
+
+          return true;
+        }
+        return false;
+      } else {
+        debugPrint('Erreur HTTP Register: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de l\'inscription: $e');
       return false;
     }
   }
@@ -210,15 +270,20 @@ class FemiApiService {
   }
 
   // --- 10. Obtenir l'état financier simplifié (GET /api/v1/etat-financier/) ---
-  Future<Map<String, dynamic>?> getEtatFinancier() async {
+  // 'annee' = exercice comptable choisi ; sans ce paramètre, Django prend
+  // l'année courante par défaut (photo du bilan à la date du jour).
+  Future<Map<String, dynamic>?> getEtatFinancier({int? annee}) async {
     final token = await getToken();
     if (token == null) return null;
 
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/etat-financier/'),
-        headers: _buildHeaders(token),
+      final uri = Uri.parse(
+        annee != null
+            ? '$baseUrl/etat-financier/?annee=$annee'
+            : '$baseUrl/etat-financier/',
       );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
@@ -258,4 +323,129 @@ class FemiApiService {
       return false;
     }
   }
+
+  // --- 12. Obtenir le grand livre simplifié (GET /api/v1/grand-livre/) ---
+  Future<Map<String, dynamic>?> getGrandLivre() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/grand-livre/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Erreur HTTP Grand Livre: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération du grand livre: $e');
+      return null;
+    }
+  }
+
+  // --- 13. Obtenir la synthèse annuelle du bilan (GET /api/v1/bilan/synthese/) ---
+  // Renvoie CA, résultat net, marge, trésorerie (calculables), plus
+  // total_bilan/ratio_autonomie/certification marqués "disponible: false" —
+  // à ne jamais afficher comme une valeur réelle côté UI.
+  Future<Map<String, dynamic>?> getBilanSynthese({int? annee}) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final uri = Uri.parse(
+        annee != null
+            ? '$baseUrl/bilan/synthese/?annee=$annee'
+            : '$baseUrl/bilan/synthese/',
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Erreur HTTP Bilan Synthèse: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la synthèse du bilan: $e');
+      return null;
+    }
+  }
+  // --- 12. Obtenir la balance générale (GET /api/v1/balance-generale/) ---
+  // 'annee' = exercice comptable ; année courante par défaut côté Django.
+  Future<Map<String, dynamic>?> getBalanceGenerale({int? annee}) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final uri = Uri.parse(
+        annee != null
+            ? '$baseUrl/balance-generale/?annee=$annee'
+            : '$baseUrl/balance-generale/',
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Erreur HTTP Balance Générale: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la balance générale: $e');
+      return null;
+    }
+  }
+  // --- 13. Obtenir la balance auxiliaire (GET /api/v1/balance-auxiliaire/) ---
+  // 'annee' = exercice comptable ; année courante par défaut côté Django.
+  Future<Map<String, dynamic>?> getBalanceAuxiliaire({int? annee}) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final uri = Uri.parse(
+        annee != null
+            ? '$baseUrl/balance-auxiliaire/?annee=$annee'
+            : '$baseUrl/balance-auxiliaire/',
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Erreur HTTP Balance Auxiliaire: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la balance auxiliaire: $e');
+      return null;
+    }
+  }
+  
+  // --- 14. Obtenir la configuration publique (GET /api/v1/config/) ---
+  // Pas besoin de token : endpoint public, utilisé pour récupérer le
+  // numéro WhatsApp Business de Femi (bouton "Continuer sur WhatsApp").
+  Future<Map<String, dynamic>?> getAppConfig() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/config/'),
+        headers: _buildHeaders(),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la config: $e');
+      return null;
+    }
+  }
+
 }

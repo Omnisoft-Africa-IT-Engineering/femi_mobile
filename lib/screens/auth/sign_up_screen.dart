@@ -50,6 +50,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    if (!email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adresse e-mail invalide'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le mot de passe doit contenir au moins 6 caractères'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (password != confirmPassword) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -60,10 +80,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    // On transmet les données saisies à l'étape suivante — elles étaient
+    // auparavant perdues car jamais passées au constructeur de
+    // CompanyInfoScreen.
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const CompanyInfoScreen(),
+        builder: (context) => CompanyInfoScreen(
+          nomComplet: nom,
+          nomEntrepriseInitial: entreprise,
+          email: email,
+          password: password,
+        ),
       ),
     );
   }
@@ -121,7 +149,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Champ Nom complet
                 const Text(
                   'Nom complet',
                   style: TextStyle(
@@ -138,7 +165,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ Nom de l'entreprise
                 const Text(
                   "Nom de l'entreprise",
                   style: TextStyle(
@@ -155,7 +181,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ Email
                 const Text(
                   'Email',
                   style: TextStyle(
@@ -173,7 +198,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ Mot de passe
                 const Text(
                   'Mot de passe',
                   style: TextStyle(
@@ -202,7 +226,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Champ Confirmation mot de passe
                 const Text(
                   'Confirmer le mot de passe',
                   style: TextStyle(
@@ -231,7 +254,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                // Bouton Suivant
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -263,7 +285,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Lien Se connecter
                 Center(
                   child: TextButton(
                     onPressed: () => Navigator.pop(context),

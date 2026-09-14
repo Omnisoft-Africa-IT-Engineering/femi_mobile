@@ -43,16 +43,19 @@ class AiDiagnosticBannerWidget extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
+                // Le "ratio d'autonomie" a été retiré : rien dans le système
+                // ne calcule de vrais capitaux propres (apports, réserves),
+                // donc affirmer un ratio ici serait une donnée inventée.
                 RichText(
                   text: TextSpan(
                     style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.4),
                     children: [
-                      const TextSpan(text: 'Excellente santé financière. L\'entreprise respecte le principe de prudence OHADA avec une marge nette de '),
+                      const TextSpan(text: 'Marge nette de '),
                       TextSpan(
                         text: '$marginPercentage%',
                         style: const TextStyle(color: Color(0xFF2DD4BF), fontWeight: FontWeight.bold),
                       ),
-                      const TextSpan(text: ' et un ratio d\'autonomie bien au-delà du seuil requis.'),
+                      const TextSpan(text: ' sur la période sélectionnée.'),
                     ],
                   ),
                 ),

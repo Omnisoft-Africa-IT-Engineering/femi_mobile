@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 class CompanyStatusCardWidget extends StatelessWidget {
   final String companyName;
   final String ccNumber;
+  // Aucune vérification de certification n'existe dans le système
+  // actuellement — ce badge ne doit s'afficher que si un jour une vraie
+  // source vérifie ce statut. Par défaut : false, badge masqué.
+  final bool isCertified;
 
   const CompanyStatusCardWidget({
     super.key,
     required this.companyName,
     required this.ccNumber,
+    this.isCertified = false,
   });
 
   @override
@@ -45,20 +50,23 @@ class CompanyStatusCardWidget extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF005AC1),
-              borderRadius: BorderRadius.circular(20),
+          // Badge affiché uniquement si isCertified est explicitement true —
+          // jamais par défaut, puisque rien ne vérifie ce statut aujourd'hui.
+          if (isCertified)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF005AC1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 12),
+                  SizedBox(width: 4),
+                  Text('Certifié', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
-            child: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white, size: 12),
-                SizedBox(width: 4),
-                Text('Certifié', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
         ],
       ),
     );

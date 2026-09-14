@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/femi_api_service.dart';
 import 'widgets/date_selector_widget.dart';
 import 'widgets/ecriture_card_widget.dart';
+import 'widgets/exercice_selector_widget.dart';
 import 'widgets/total_card_widget.dart';
 
 class RegistreJournalierScreen extends StatefulWidget {
@@ -14,12 +15,17 @@ class RegistreJournalierScreen extends StatefulWidget {
 
 class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
   final FemiApiService _apiService = FemiApiService();
-  DateTime _dateSelectionnee = DateTime.now();
+
+  late int _exerciceSelectionne;
+  late DateTime _dateSelectionnee;
   late Future<Map<String, dynamic>?> _registreFuture;
 
   @override
   void initState() {
     super.initState();
+    final DateTime aujourdhui = DateTime.now();
+    _exerciceSelectionne = aujourdhui.year;
+    _dateSelectionnee = aujourdhui;
     _chargerDonnees();
   }
 
@@ -27,9 +33,35 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
     _registreFuture = _apiService.getRegistreJournalier(date: _dateSelectionnee);
   }
 
-  void _changerDate(int deltaJours) {
+  /// Change l'exercice sélectionné et recale la date dans les bornes
+  /// de ce nouvel exercice avant de recharger les données.
+  void _changerExercice(int nouvelExercice) {
     setState(() {
-      _dateSelectionnee = _dateSelectionnee.add(Duration(days: deltaJours));
+      _exerciceSelectionne = nouvelExercice;
+
+      final DateTime aujourdhui = DateTime.now();
+      if (nouvelExercice == aujourdhui.year) {
+        // Exercice en cours : on se replace sur aujourd'hui.
+        _dateSelectionnee = aujourdhui;
+      } else {
+        // Exercice révolu : on se place au 31 décembre de cet exercice.
+        _dateSelectionnee = DateTime(nouvelExercice, 12, 31);
+      }
+
+      _chargerDonnees();
+    });
+  }
+
+  void _changerDate(int deltaJours) {
+    final DateTime nouvelleDate = _dateSelectionnee.add(Duration(days: deltaJours));
+
+    // On ne laisse jamais la navigation jour/jour sortir de l'exercice sélectionné.
+    if (nouvelleDate.year != _exerciceSelectionne) {
+      return;
+    }
+
+    setState(() {
+      _dateSelectionnee = nouvelleDate;
       _chargerDonnees();
     });
   }
@@ -53,7 +85,6 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
   String _formatMontant(dynamic value, String devise) {
     if (value == null) return '0 $devise';
     final double amount = (value is num) ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
-    // Espace comme séparateur de milliers, courant en zone XOF/CFA.
     final String entier = amount.toStringAsFixed(0);
     final buffer = StringBuffer();
     for (int i = 0; i < entier.length; i++) {
@@ -108,7 +139,13 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                     'Registre Journalier',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+
+                  ExerciceSelectorWidget(
+                    exerciceSelectionne: _exerciceSelectionne,
+                    onExerciceChange: _changerExercice,
+                  ),
+                  const SizedBox(height: 12),
 
                   DateSelectorWidget(
                     dateText: _formatDate(_dateSelectionnee),

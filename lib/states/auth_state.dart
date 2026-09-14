@@ -60,6 +60,46 @@ class AuthState {
     }
   }
 
+  /// Inscription : crée l'entreprise + l'utilisateur, puis connecte
+  /// automatiquement (même comportement que login()).
+  Future<bool> register({
+    required String username,
+    required String password,
+    required String nomEntreprise,
+    String? nomComplet,
+    String? email,
+    String? telephoneWhatsapp,
+    String? secteurNom,
+    String? devise,
+  }) async {
+    isLoading.value = true;
+    errorMessage.value = null;
+
+    final success = await _apiService.register(
+      username: username,
+      password: password,
+      nomEntreprise: nomEntreprise,
+      nomComplet: nomComplet,
+      email: email,
+      telephoneWhatsapp: telephoneWhatsapp,
+      secteurNom: secteurNom,
+      devise: devise,
+    );
+
+    isLoading.value = false;
+
+    if (success) {
+      if (isLoggedIn.value) {
+        isLoggedIn.value = false;
+      }
+      isLoggedIn.value = true;
+      return true;
+    } else {
+      errorMessage.value = "Impossible de créer le compte (nom d'utilisateur déjà pris, ou erreur serveur).";
+      return false;
+    }
+  }
+
   /// Déconnexion : supprime le token du stockage sécurisé et réinitialise l'état.
   Future<void> logout() async {
     await _apiService.logout();

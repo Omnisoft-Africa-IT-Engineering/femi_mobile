@@ -39,6 +39,11 @@ class FemiAgentService {
     final uri = Uri.parse('$baseUrl/v1/transactions/process/');
     var request = http.MultipartRequest('POST', uri);
 
+    // 0. Header requis pour contourner la page d'avertissement ngrok
+    // (sinon ngrok renvoie une page HTML sans headers CORS et le
+    // navigateur bloque la réponse comme une erreur CORS).
+    request.headers['ngrok-skip-browser-warning'] = 'true';
+
     // 1. Récupération et nettoyage du Token d'authentification
     String? token = await _storage.read(key: 'auth_token') ??
         await _storage.read(key: 'token') ??

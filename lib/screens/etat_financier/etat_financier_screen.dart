@@ -3,6 +3,7 @@ import '../../services/femi_api_service.dart';
 import '../../services/pdf_export_service.dart';
 import 'widgets/total_bilan_card.dart';
 import 'widgets/financial_section_card.dart';
+import '../registre_journalier/widgets/exercice_selector_widget.dart';
 
 class EtatFinancierScreen extends StatefulWidget {
   const EtatFinancierScreen({super.key});
@@ -13,19 +14,28 @@ class EtatFinancierScreen extends StatefulWidget {
 
 class _EtatFinancierScreenState extends State<EtatFinancierScreen> {
   final FemiApiService _apiService = FemiApiService();
+  late int _exerciceSelectionne;
   late Future<Map<String, dynamic>?> _bilanFuture;
 
   @override
   void initState() {
     super.initState();
-    _bilanFuture = _apiService.getEtatFinancier();
+    _exerciceSelectionne = DateTime.now().year;
+    _bilanFuture = _apiService.getEtatFinancier(annee: _exerciceSelectionne);
   }
 
   Future<void> _rafraichir() async {
     setState(() {
-      _bilanFuture = _apiService.getEtatFinancier();
+      _bilanFuture = _apiService.getEtatFinancier(annee: _exerciceSelectionne);
     });
     await _bilanFuture;
+  }
+
+  void _changerExercice(int nouvelExercice) {
+    setState(() {
+      _exerciceSelectionne = nouvelExercice;
+      _bilanFuture = _apiService.getEtatFinancier(annee: _exerciceSelectionne);
+    });
   }
 
   String _formatMontant(dynamic value, String devise) {
@@ -168,6 +178,12 @@ class _EtatFinancierScreenState extends State<EtatFinancierScreen> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  ExerciceSelectorWidget(
+                    exerciceSelectionne: _exerciceSelectionne,
+                    onExerciceChange: _changerExercice,
                   ),
                   const SizedBox(height: 8),
 

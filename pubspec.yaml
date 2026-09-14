@@ -22,6 +22,9 @@ dependencies:
   record: ^7.1.1
   path_provider: ^2.1.2
 
+  # Ajouté pour le bouton/bandeau "Continuer sur WhatsApp"
+  url_launcher: ^6.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -3,17 +3,20 @@ import 'package:flutter/material.dart';
 class MainKpiCardWidget extends StatelessWidget {
   final String title;
   final String amount;
-  final String growthPercentage;
+  // null = croissance indisponible (pas de données de l'année précédente)
+  final String? growthPercentage;
 
   const MainKpiCardWidget({
     super.key,
     required this.title,
     required this.amount,
-    required this.growthPercentage,
+    this.growthPercentage,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool hasGrowth = growthPercentage != null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -28,23 +31,36 @@ class MainKpiCardWidget extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD1E4D1),
-                  borderRadius: BorderRadius.circular(12),
+              if (hasGrowth)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD1E4D1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.trending_up, size: 12, color: Color(0xFF0F9D58)),
+                      const SizedBox(width: 2),
+                      Text(
+                        growthPercentage!,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F9D58)),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'N/A',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.trending_up, size: 12, color: Color(0xFF0F9D58)),
-                    const SizedBox(width: 2),
-                    Text(
-                      growthPercentage,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F9D58)),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 8),

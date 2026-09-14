@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
 import '../../states/auth_state.dart';
-import '../subscription_pay/subscription_pay_screen.dart';
 
-/// Étape 3 de l'onboarding — Informations sur l'entreprise.
+/// Étape 2 de l'onboarding — Informations sur l'entreprise.
+/// Finalise la création du compte (Entreprise + Utilisateur) en combinant
+/// les données de cet écran avec celles transmises depuis SignUpScreen.
 class CompanyInfoScreen extends StatefulWidget {
-  const CompanyInfoScreen({super.key});
+  final String nomComplet;
+  final String nomEntrepriseInitial;
+  final String email;
+  final String password;
+
+  const CompanyInfoScreen({
+    super.key,
+    required this.nomComplet,
+    required this.nomEntrepriseInitial,
+    required this.email,
+    required this.password,
+  });
 
   @override
   State<CompanyInfoScreen> createState() => _CompanyInfoScreenState();
 }
 
 class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
-  final TextEditingController _nomEntrepriseController = TextEditingController();
+  late final TextEditingController _nomEntrepriseController;
   final TextEditingController _adresseController = TextEditingController();
   final TextEditingController _villeController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
@@ -39,6 +51,13 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Pré-rempli avec le nom saisi à l'étape 1, mais reste modifiable.
+    _nomEntrepriseController = TextEditingController(text: widget.nomEntrepriseInitial);
+  }
+
+  @override
   void dispose() {
     _nomEntrepriseController.dispose();
     _adresseController.dispose();
@@ -48,21 +67,52 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
   }
 
   Future<void> _terminerOnboarding() async {
-    final success = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (context) => const SubscriptionPayScreen()),
+    final nomEntreprise = _nomEntrepriseController.text.trim();
+    if (nomEntreprise.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le nom de l\'entreprise est requis'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Inscription réelle : email comme identifiant (username), cohérent
+    // avec LoginAPIView qui accepte déjà l'email comme identifiant.
+    final success = await AuthState.instance.register(
+      username: widget.email,
+      password: widget.password,
+      nomEntreprise: nomEntreprise,
+      nomComplet: widget.nomComplet,
+      email: widget.email,
+      telephoneWhatsapp: _telephoneController.text.trim().isEmpty
+          ? null
+          : _telephoneController.text.trim(),
+      secteurNom: _secteurActivite,
+      devise: _devise,
     );
 
-    if (mounted && (success ?? false)) {
-      final dummyToken = 'session_token_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // On récupère le nom de l'entreprise (String) pour le second paramètre
-      final companyName = _nomEntrepriseController.text.trim().isNotEmpty
-          ? _nomEntrepriseController.text.trim()
-          : 'Entreprise';
+    if (!mounted) return;
 
-      // Transmet deux arguments de type String à login(String token, String name)
-      AuthState.instance.login(dummyToken, companyName);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Compte créé avec succès ! Bienvenue sur Femi 🎉'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      // AuthGate (à la racine) écoute AuthState.instance.isLoggedIn et
+      // affichera automatiquement MainNavigationScreen maintenant qu'il
+      // est passé à true — mais comme ces écrans d'onboarding ont été
+      // empilés par-dessus via Navigator.push, il faut vider la pile
+      // pour que ce changement redevienne visible à l'écran.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } else {
+      final error = AuthState.instance.errorMessage.value ?? 'Une erreur est survenue.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -287,34 +337,45 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _terminerOnboarding,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Continuer',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                ValueListenableBuilder<bool>(
+                  valueListenable: AuthState.instance.isLoading,
+                  builder: (context, isLoading, _) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _terminerOnboarding,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
                           ),
+                          elevation: 0,
                         ),
-                        SizedBox(width: 6),
-                        Icon(Icons.arrow_forward, size: 18),
-                      ],
-                    ),
-                  ),
+                        child: isLoading
+                            ? const SizedBox(
+                                height: 22,
+                                width: 22,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Continuer',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Icon(Icons.arrow_forward, size: 18),
+                                ],
+                              ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
               ],

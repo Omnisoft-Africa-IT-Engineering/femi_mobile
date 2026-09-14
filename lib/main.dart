@@ -51,11 +51,30 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    DashboardScreen(),
-    FemiChatScreen(),
-    CompteScreen(),
-  ];
+  // --- Basculement vers Femi avec un prompt contextuel ---
+  // `_femiPromptNonce` change à chaque déclenchement, même si le texte
+  // du prompt est identique à la fois précédente : c'est ce qui permet à
+  // FemiChatScreen (gardé en vie par l'IndexedStack) de détecter qu'un
+  // NOUVEL envoi est demandé, via didUpdateWidget.
+  String? _pendingFemiPrompt;
+  int _femiPromptNonce = 0;
+
+  void _switchToFemiWithPrompt(String prompt) {
+    setState(() {
+      _currentIndex = 1;
+      _pendingFemiPrompt = prompt;
+      _femiPromptNonce++;
+    });
+  }
+
+  List<Widget> get _screens => [
+        DashboardScreen(onNavigateToFemi: _switchToFemiWithPrompt),
+        FemiChatScreen(
+          initialPrompt: _pendingFemiPrompt,
+          promptNonce: _femiPromptNonce,
+        ),
+        const CompteScreen(),
+      ];
 
   @override
   Widget build(BuildContext context) {
