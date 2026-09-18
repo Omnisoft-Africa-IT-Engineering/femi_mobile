@@ -25,6 +25,9 @@ dependencies:
   # Ajouté pour le bouton/bandeau "Continuer sur WhatsApp"
   url_launcher: ^6.3.0
 
+  # Ajouté pour afficher la page de paiement FedaPay dans l'app
+  webview_flutter: ^4.10.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

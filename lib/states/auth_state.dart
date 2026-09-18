@@ -14,9 +14,10 @@ class AuthState {
 
   /// true = formule PRO active → débloque les fonctionnalités avancées.
   /// État global, écouté par tous les écrans (ex: CompteScreen).
-  /// MODE TEST : passé à true directement par SubscriptionPayScreen,
-  /// sans appel API réel. TODO: brancher sur le vrai statut d'abonnement
-  /// renvoyé par le backend (via checkAuthStatus / login) avant la prod.
+  /// Resynchronisé depuis le vrai profil Django (voir
+  /// refreshIsProFromBackend) au démarrage, après login, après register,
+  /// et après un paiement réussi — ce n'est donc plus une valeur purement
+  /// locale qui pourrait se désynchroniser de la vérité serveur.
   final ValueNotifier<bool> isPro = ValueNotifier<bool>(false);
 
   /// Indique si la requête de connexion réseau est en cours
@@ -25,17 +26,76 @@ class AuthState {
   /// Message d'erreur à afficher en cas de problème de connexion
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
 
-  /// Vérifie au démarrage de l'app si un token existe déjà en mémoire
+  /// Relit le profil utilisateur réel depuis Django (GET /auth/profile/)
+  /// et met à jour isPro en fonction du champ renvoyé par le backend.
+  ///
+  /// ⚠️ Le nom exact du champ (is_pro ? plan ? subscription_status ?)
+  /// n'est pas encore confirmé côté Django — cette méthode essaie
+  /// plusieurs noms plausibles. À AJUSTER dès que le champ réel est
+  /// connu : il suffit de compléter/corriger _extractIsPro ci-dessous,
+  /// rien d'autre à changer dans l'app.
+  ///
+  /// Si aucun champ reconnu n'est trouvé dans la réponse, isPro n'est PAS
+  /// modifié (on ne force pas à false par erreur d'interprétation).
+  Future<void> refreshIsProFromBackend() async {
+    final profile = await _apiService.getUserProfile();
+    if (profile == null) return;
+
+    final detected = _extractIsPro(profile);
+    if (detected != null) {
+      isPro.value = detected;
+    } else {
+      debugPrint(
+        '⚠️ Impossible de déterminer le statut Pro depuis /auth/profile/ '
+        '— aucun champ reconnu dans la réponse : $profile. '
+        'Vérifiez le nom exact du champ côté Django et ajustez '
+        '_extractIsPro dans auth_state.dart.',
+      );
+    }
+  }
+
+  bool? _extractIsPro(Map<String, dynamic> profile) {
+    // Champs booléens directs les plus probables.
+    for (final key in ['is_pro', 'isPro', 'is_premium', 'pro']) {
+      final value = profile[key];
+      if (value is bool) return value;
+      if (value is String) {
+        final lower = value.toLowerCase();
+        if (lower == 'true' || lower == 'false') return lower == 'true';
+      }
+    }
+
+    // Champs "plan" / "subscription_status" (chaîne de caractères).
+    final planValue = profile['plan'] ??
+        profile['subscription_status'] ??
+        profile['subscription_plan'] ??
+        profile['abonnement'];
+
+    if (planValue != null) {
+      final lower = planValue.toString().toLowerCase();
+      // 'micro' est un plan payant lui aussi (pas juste gratuit) — à
+      // ajuster si "gratuit"/"free" doit être distingué d'un vrai palier.
+      return lower == 'pro' ||
+          lower == 'business' ||
+          lower == 'micro' ||
+          lower == 'active' ||
+          lower == 'actif' ||
+          lower == 'premium';
+    }
+
+    return null;
+  }
+
+  /// Vérifie au démarrage de l'app si un token existe déjà en mémoire,
+  /// et si oui, resynchronise isPro avec le vrai statut Django.
   Future<void> checkAuthStatus() async {
     final token = await _apiService.getToken();
     if (token != null && token.isNotEmpty) {
       isLoggedIn.value = true;
+      await refreshIsProFromBackend();
     } else {
       isLoggedIn.value = false;
     }
-    // TODO: quand le vrai système d'abonnement sera branché, récupérer ici
-    // le statut PRO persistant (ex: via _apiService ou SharedPreferences)
-    // et l'assigner à isPro.value, pour qu'il survive au redémarrage de l'app.
   }
 
   /// Connexion réelle au backend Django via l'API.
@@ -53,6 +113,7 @@ class AuthState {
         isLoggedIn.value = false;
       }
       isLoggedIn.value = true;
+      await refreshIsProFromBackend();
       return true;
     } else {
       errorMessage.value = "Identifiants incorrects ou serveur indisponible.";
@@ -93,6 +154,12 @@ class AuthState {
         isLoggedIn.value = false;
       }
       isLoggedIn.value = true;
+      // Un utilisateur qui vient de s'inscrire n'a normalement pas encore
+      // de formule payante (sauf si le paiement a eu lieu juste avant cet
+      // appel, comme dans le flux onboarding → SubscriptionPayScreen : dans
+      // ce cas c'est activatePlan(), appelé séparément là-bas, qui fera
+      // foi). On resynchronise quand même par cohérence avec login().
+      await refreshIsProFromBackend();
       return true;
     } else {
       errorMessage.value = "Impossible de créer le compte (nom d'utilisateur déjà pris, ou erreur serveur).";

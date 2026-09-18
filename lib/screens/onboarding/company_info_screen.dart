@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../states/auth_state.dart';
+import '../subscription_pay/subscription_pay_screen.dart'; // ⚠️ ajustez ce chemin selon votre arborescence réelle
 
 /// Étape 2 de l'onboarding — Informations sur l'entreprise.
-/// Finalise la création du compte (Entreprise + Utilisateur) en combinant
-/// les données de cet écran avec celles transmises depuis SignUpScreen.
+/// Ne crée plus le compte directement : redirige vers SubscriptionPayScreen,
+/// qui finalise la création du compte (Entreprise + Utilisateur) une fois
+/// le paiement de l'abonnement confirmé.
 class CompanyInfoScreen extends StatefulWidget {
   final String nomComplet;
   final String nomEntrepriseInitial;
@@ -66,7 +67,11 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
     super.dispose();
   }
 
-  Future<void> _terminerOnboarding() async {
+  /// Valide le formulaire puis ouvre l'écran d'abonnement/paiement.
+  /// La création du compte (AuthState.instance.register) ne se fait plus
+  /// ici : c'est SubscriptionPayScreen qui s'en charge une fois le
+  /// paiement confirmé (voir isOnboarding / _gererPaiement là-bas).
+  void _continuerVersPaiement() {
     final nomEntreprise = _nomEntrepriseController.text.trim();
     if (nomEntreprise.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,42 +83,21 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       return;
     }
 
-    // Inscription réelle : email comme identifiant (username), cohérent
-    // avec LoginAPIView qui accepte déjà l'email comme identifiant.
-    final success = await AuthState.instance.register(
-      username: widget.email,
-      password: widget.password,
-      nomEntreprise: nomEntreprise,
-      nomComplet: widget.nomComplet,
-      email: widget.email,
-      telephoneWhatsapp: _telephoneController.text.trim().isEmpty
-          ? null
-          : _telephoneController.text.trim(),
-      secteurNom: _secteurActivite,
-      devise: _devise,
-    );
-
-    if (!mounted) return;
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Compte créé avec succès ! Bienvenue sur Femi 🎉'),
-          backgroundColor: Colors.green,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SubscriptionPayScreen(
+          nomComplet: widget.nomComplet,
+          email: widget.email,
+          password: widget.password,
+          nomEntreprise: nomEntreprise,
+          secteurNom: _secteurActivite,
+          telephoneWhatsapp: _telephoneController.text.trim().isEmpty
+              ? null
+              : _telephoneController.text.trim(),
+          devise: _devise,
         ),
-      );
-      // AuthGate (à la racine) écoute AuthState.instance.isLoggedIn et
-      // affichera automatiquement MainNavigationScreen maintenant qu'il
-      // est passé à true — mais comme ces écrans d'onboarding ont été
-      // empilés par-dessus via Navigator.push, il faut vider la pile
-      // pour que ce changement redevienne visible à l'écran.
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } else {
-      final error = AuthState.instance.errorMessage.value ?? 'Une erreur est survenue.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error), backgroundColor: Colors.red),
-      );
-    }
+      ),
+    );
   }
 
   @override
@@ -337,45 +321,34 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                ValueListenableBuilder<bool>(
-                  valueListenable: AuthState.instance.isLoading,
-                  builder: (context, isLoading, _) {
-                    return SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: isLoading ? null : _terminerOnboarding,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryBlue,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: isLoading
-                            ? const SizedBox(
-                                height: 22,
-                                width: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    'Continuer',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  SizedBox(width: 6),
-                                  Icon(Icons.arrow_forward, size: 18),
-                                ],
-                              ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _continuerVersPaiement,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                    );
-                  },
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Continuer',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Icon(Icons.arrow_forward, size: 18),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
               ],

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/femi_api_service.dart';
-import 'widgets/date_selector_widget.dart';
-import 'widgets/ecriture_card_widget.dart';
+import '../../services/pdf_export_service.dart';
 import 'widgets/exercice_selector_widget.dart';
+import 'widgets/ecriture_card_widget.dart';
 import 'widgets/total_card_widget.dart';
 
 class RegistreJournalierScreen extends StatefulWidget {
@@ -17,7 +17,7 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
   final FemiApiService _apiService = FemiApiService();
 
   late int _exerciceSelectionne;
-  late DateTime _dateSelectionnee;
+  late DateTimeRange _periodeSelectionnee;
   late Future<Map<String, dynamic>?> _registreFuture;
 
   @override
@@ -25,61 +25,85 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
     super.initState();
     final DateTime aujourdhui = DateTime.now();
     _exerciceSelectionne = aujourdhui.year;
-    _dateSelectionnee = aujourdhui;
+
+    // Plage par défaut : du 1er du mois jusqu'à aujourd'hui
+    _periodeSelectionnee = DateTimeRange(
+      start: DateTime(aujourdhui.year, aujourdhui.month, 1),
+      end: aujourdhui,
+    );
+
     _chargerDonnees();
   }
 
   void _chargerDonnees() {
-    _registreFuture = _apiService.getRegistreJournalier(date: _dateSelectionnee);
+    _registreFuture = _apiService.getRegistreJournalier(
+      dateDebut: _periodeSelectionnee.start,
+      dateFin: _periodeSelectionnee.end,
+    );
   }
 
-  /// Change l'exercice sélectionné et recale la date dans les bornes
-  /// de ce nouvel exercice avant de recharger les données.
+  /// Change l'exercice et recale la plage dans les bornes de cet exercice
   void _changerExercice(int nouvelExercice) {
     setState(() {
       _exerciceSelectionne = nouvelExercice;
 
       final DateTime aujourdhui = DateTime.now();
       if (nouvelExercice == aujourdhui.year) {
-        // Exercice en cours : on se replace sur aujourd'hui.
-        _dateSelectionnee = aujourdhui;
+        _periodeSelectionnee = DateTimeRange(
+          start: DateTime(aujourdhui.year, aujourdhui.month, 1),
+          end: aujourdhui,
+        );
       } else {
-        // Exercice révolu : on se place au 31 décembre de cet exercice.
-        _dateSelectionnee = DateTime(nouvelExercice, 12, 31);
+        // Pour un exercice passé, toute l'année sélectionnée par défaut
+        _periodeSelectionnee = DateTimeRange(
+          start: DateTime(nouvelExercice, 1, 1),
+          end: DateTime(nouvelExercice, 12, 31),
+        );
       }
 
       _chargerDonnees();
     });
   }
 
-  void _changerDate(int deltaJours) {
-    final DateTime nouvelleDate = _dateSelectionnee.add(Duration(days: deltaJours));
+  /// Ouvre le sélectionneur de plage de dates (DateRangePicker)
+  Future<void> _selectionnerPlageDates(BuildContext context) async {
+    final DateTimeRange? nouvellePlage = await showDateRangePicker(
+      context: context,
+      initialDateRange: _periodeSelectionnee,
+      firstDate: DateTime(_exerciceSelectionne, 1, 1),
+      lastDate: DateTime(_exerciceSelectionne, 12, 31),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF006654),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
 
-    // On ne laisse jamais la navigation jour/jour sortir de l'exercice sélectionné.
-    if (nouvelleDate.year != _exerciceSelectionne) {
-      return;
+    if (nouvellePlage != null && nouvellePlage != _periodeSelectionnee) {
+      setState(() {
+        _periodeSelectionnee = nouvellePlage;
+        _chargerDonnees();
+      });
     }
-
-    setState(() {
-      _dateSelectionnee = nouvelleDate;
-      _chargerDonnees();
-    });
   }
 
   String _formatDate(DateTime date) {
     const mois = [
-      'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-      'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+      'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+      'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'
     ];
     return '${date.day} ${mois[date.month - 1]} ${date.year}';
   }
 
-  String _sousTitreDate(DateTime date) {
-    final aujourdhui = DateTime.now();
-    final estAujourdhui = date.year == aujourdhui.year &&
-        date.month == aujourdhui.month &&
-        date.day == aujourdhui.day;
-    return estAujourdhui ? "Aujourd'hui" : '';
+  String _formatPlageDates(DateTimeRange plage) {
+    return '${_formatDate(plage.start)} — ${_formatDate(plage.end)}';
   }
 
   String _formatMontant(dynamic value, String devise) {
@@ -92,6 +116,32 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
       buffer.write(entier[i]);
     }
     return '$buffer $devise';
+  }
+
+  void _telechargerPdf(Map<String, dynamic> data) {
+    final String devise = (data['devise'] as String?) ?? 'XOF';
+    final List<dynamic> ecrituresBrutes = (data['ecritures'] as List<dynamic>?) ?? [];
+
+    final List<Map<String, String>> ecrituresPdf = ecrituresBrutes.map((brute) {
+      final ecriture = brute as Map<String, dynamic>;
+      final bool estRecette = ecriture['type'] == 'RECETTE';
+      final double montant = (ecriture['montant'] as num?)?.toDouble() ?? 0.0;
+
+      return {
+        'date': (ecriture['date'] ?? '').toString(),
+        'heure': (ecriture['heure'] ?? '').toString(),
+        'titre': (ecriture['titre'] ?? '').toString(),
+        'categorie': (ecriture['categorie'] ?? (estRecette ? 'Recette' : 'Dépense')).toString(),
+        'montant': '${estRecette ? '+ ' : '- '}${_formatMontant(montant, devise)}',
+      };
+    }).toList();
+
+    PdfExportService.exportRegistreJournalier(
+      dateLabel: _formatPlageDates(_periodeSelectionnee),
+      totalRecettes: _formatMontant(data['total_recettes'], devise),
+      totalDepenses: _formatMontant(data['total_depenses'], devise),
+      ecritures: ecrituresPdf,
+    );
   }
 
   @override
@@ -147,11 +197,38 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  DateSelectorWidget(
-                    dateText: _formatDate(_dateSelectionnee),
-                    subtitle: _sousTitreDate(_dateSelectionnee),
-                    onPrevious: () => _changerDate(-1),
-                    onNext: () => _changerDate(1),
+                  // Sélecteur de Plage de Dates
+                  InkWell(
+                    onTap: () => _selectionnerPlageDates(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.date_range_outlined, color: Color(0xFF006654), size: 22),
+                              const SizedBox(width: 12),
+                              Text(
+                                _formatPlageDates(_periodeSelectionnee),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Icon(Icons.edit_calendar, color: Color(0xFF64748B), size: 18),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 20),
 
@@ -185,7 +262,7 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                         padding: EdgeInsets.symmetric(vertical: 24),
                         child: Center(
                           child: Text(
-                            'Aucune transaction ce jour-là.',
+                            'Aucune transaction enregistrée pour cette période.',
                             style: TextStyle(color: Colors.black45),
                           ),
                         ),
@@ -223,7 +300,7 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      onPressed: () {},
+                      onPressed: chargement ? null : () => _telechargerPdf(data),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF006654),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

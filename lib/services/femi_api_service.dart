@@ -244,25 +244,34 @@ class FemiApiService {
     }
   }
 
-  // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
-  Future<Map<String, dynamic>?> getRegistreJournalier({DateTime? date}) async {
+ // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
+  Future<Map<String, dynamic>?> getRegistreJournalier({
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
     final token = await getToken();
     if (token == null) return null;
 
-    final jour = date ?? DateTime.now();
-    final dateStr =
-        '${jour.year.toString().padLeft(4, '0')}-${jour.month.toString().padLeft(2, '0')}-${jour.day.toString().padLeft(2, '0')}';
+    final debut = dateDebut ?? DateTime.now();
+    final fin = dateFin ?? debut;
+
+    final String dateDebutStr =
+        '${debut.year.toString().padLeft(4, '0')}-${debut.month.toString().padLeft(2, '0')}-${debut.day.toString().padLeft(2, '0')}';
+    final String dateFinStr =
+        '${fin.year.toString().padLeft(4, '0')}-${fin.month.toString().padLeft(2, '0')}-${fin.day.toString().padLeft(2, '0')}';
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/registre-journalier/?date=$dateStr'),
+        Uri.parse('$baseUrl/registre-journalier/?date_debut=$dateDebutStr&date_fin=$dateFinStr'),
         headers: _buildHeaders(token),
       );
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
+      } else {
+        debugPrint('Erreur HTTP Registre Journalier: ${response.statusCode} - ${response.body}');
+        return null;
       }
-      return null;
     } catch (e) {
       debugPrint('Erreur lors de la récupération du registre journalier: $e');
       return null;
@@ -296,7 +305,10 @@ class FemiApiService {
   }
 
   // --- 11. Activer une formule d'abonnement (POST /api/v1/activate-plan/) ---
-  Future<bool> activatePlan({required String planTitle}) async {
+  // transactionId : optionnel, transaction_id renvoyé par la mutation
+  // payWithFedaPay. Envoyé si fourni, pour que Django puisse vérifier/
+  // tracer le paiement plutôt que de faire confiance à l'appel seul.
+  Future<bool> activatePlan({required String planTitle, String? transactionId}) async {
     final token = await getToken();
     if (token == null) {
       debugPrint('❌ Token d\'authentification introuvable.');
@@ -309,6 +321,8 @@ class FemiApiService {
         headers: _buildHeaders(token),
         body: jsonEncode({
           'plan': planTitle,
+          if (transactionId != null && transactionId.isNotEmpty)
+            'transaction_id': transactionId,
         }),
       );
 
@@ -427,7 +441,10 @@ class FemiApiService {
       return null;
     }
   }
-  
+
+  // --- 14. Obtenir la configuration publique (GET /api/v1/config/) ---
+  // Pas besoin de token : endpoint public, utilisé pour récupérer le
+  // numéro WhatsApp Business de Femi (bouton "Continuer sur WhatsApp").
   // --- 14. Obtenir la configuration publique (GET /api/v1/config/) ---
   // Pas besoin de token : endpoint public, utilisé pour récupérer le
   // numéro WhatsApp Business de Femi (bouton "Continuer sur WhatsApp").
@@ -448,4 +465,29 @@ class FemiApiService {
     }
   }
 
+  // --- 15. Persistance d'une inscription en attente après paiement confirmé ---
+  // Sécurité : si register() échoue juste après un paiement FedaPay réussi
+  // (panne réseau, serveur Django indisponible...), on ne veut pas perdre
+  // les infos ni forcer l'utilisateur à repayer. On les garde ici jusqu'à
+  // ce que register() + activatePlan() réussissent réellement.
+  static const String _pendingRegistrationKey = 'pending_registration';
+
+  Future<void> savePendingRegistration(Map<String, dynamic> data) async {
+    await _storage.write(key: _pendingRegistrationKey, value: jsonEncode(data));
+  }
+
+  Future<Map<String, dynamic>?> getPendingRegistration() async {
+    final raw = await _storage.read(key: _pendingRegistrationKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return jsonDecode(raw) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Erreur lors de la lecture de pending_registration: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearPendingRegistration() async {
+    await _storage.delete(key: _pendingRegistrationKey);
+  } 
 }

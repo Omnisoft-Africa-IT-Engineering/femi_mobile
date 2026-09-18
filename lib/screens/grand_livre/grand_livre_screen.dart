@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/femi_api_service.dart';
 import 'widgets/compte_card_widget.dart';
+import '../../services/pdf_export_service.dart';
 
 class GrandLivreScreen extends StatefulWidget {
   const GrandLivreScreen({super.key});
@@ -171,7 +172,15 @@ class _GrandLivreScreenState extends State<GrandLivreScreen> {
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
-                        onPressed: () {},
+                        onPressed: () {
+                          PdfExportService.exportGrandLivre(
+                            devise: devise,
+                            totalDebit: totalDebit.toString(),
+                            totalCredit: totalCredit.toString(),
+                            soldeNet: soldeNet.toString(),
+                            comptes: comptesData,
+                          );
+                        },
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [

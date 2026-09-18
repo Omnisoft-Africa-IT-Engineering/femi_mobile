@@ -67,38 +67,69 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
+  // --- Basculement d'onglet demandé depuis un écran enfant ---
+  // Utilisé par le Drawer de FemiChatScreen pour "Tableau de bord" et
+  // "Compte", qui sont des onglets de cet IndexedStack, pas des écrans
+  // indépendants qu'on peut simplement empiler par-dessus. Aussi utilisé
+  // par la flèche de retour de FemiChatScreen (voir onBack ci-dessous).
+  void _switchToTab(int index) {
+    setState(() => _currentIndex = index);
+  }
+
   List<Widget> get _screens => [
-        DashboardScreen(onNavigateToFemi: _switchToFemiWithPrompt),
+        DashboardScreen(
+          onNavigateToFemi: _switchToFemiWithPrompt,
+          onNavigateToTab: _switchToTab),
+
         FemiChatScreen(
           initialPrompt: _pendingFemiPrompt,
           promptNonce: _femiPromptNonce,
+          // Comme MainNavigationScreen est l'unique route de l'app (les
+          // onglets ne sont que des index d'IndexedStack, pas des routes
+          // Navigator séparées), la flèche de retour de l'AppBar ne peut
+          // pas faire un Navigator.pop classique — il n'y a rien à
+          // dépiler. On lui dit explicitement de revenir au Dashboard.
+          onBack: () => _switchToTab(0),
         ),
         const CompteScreen(),
       ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          boxShadow: [
-            BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 1),
-          ],
+    return PopScope(
+      // On n'autorise la fermeture réelle de l'app (pop du dernier écran)
+      // que si on est déjà sur l'onglet Dashboard (index 0). Sinon, on
+      // intercepte le retour (bouton système Android / bouton retour du
+      // navigateur Chrome) pour revenir au Dashboard au lieu de laisser
+      // Flutter tenter de fermer l'app, ce qui provoquait l'écran
+      // noir/blanc observé.
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _switchToTab(0);
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _screens,
         ),
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(0, Icons.grid_view_rounded, 'KPI'),
-            _buildNavItem(1, Icons.auto_awesome, 'Femi'),
-            _buildNavItem(2, Icons.account_balance_outlined, 'Compte'),
-          ],
+        bottomNavigationBar: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            boxShadow: [
+              BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 1),
+            ],
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.grid_view_rounded, 'KPI'),
+              _buildNavItem(1, Icons.auto_awesome, 'Femi'),
+              _buildNavItem(2, Icons.account_balance_outlined, 'Compte'),
+            ],
+          ),
         ),
       ),
     );

@@ -3,13 +3,18 @@ import '../../services/femi_api_service.dart';
 import 'widgets/ai_recommendation_card_widget.dart';
 import 'widgets/ai_summary_card_widget.dart';
 import 'widgets/metric_card_widget.dart';
+import '../femi_chat/widgets/femi_drawer_widget.dart';
 
 class DashboardScreen extends StatefulWidget {
   /// Appelé quand l'utilisateur veut basculer vers l'agent Femi avec un
   /// message pré-rempli (ex. depuis la carte de recommandation IA).
   final void Function(String prompt)? onNavigateToFemi;
 
-  const DashboardScreen({super.key, this.onNavigateToFemi});
+  /// Permet au Drawer de demander à MainNavigationScreen de basculer
+  /// vers un autre onglet (Chat Femi = 1, Compte = 2).
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const DashboardScreen({super.key, this.onNavigateToFemi, this.onNavigateToTab});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -55,6 +60,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _kpisFuture;
   }
 
+  /// Envoie le contenu de la barre de recherche à Femi (bascule vers son
+  /// onglet avec ce texte comme prompt initial), puis vide le champ.
+  void _envoyerRechercheVersFemi() {
+    final query = _queryController.text.trim();
+    if (query.isEmpty) return;
+    widget.onNavigateToFemi?.call(query);
+    _queryController.clear();
+  }
+
   String _formatCompactAmount(dynamic value, {String currency = 'FCFA'}) {
     if (value == null) return '0 $currency';
 
@@ -89,23 +103,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
+      drawer: FemiDrawerWidget(
+        currentTabIndex: FemiDrawerWidget.tabDashboard,
+        onNavigateToTab: widget.onNavigateToTab,
+      ),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const Padding(
-          padding: EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=5'),
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu, color: Colors.black87),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
         ),
-        title: Text(
-          _companyName,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
+        title: Row(
+          children: [
+            const CircleAvatar(
+              radius: 16,
+              backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=5'),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _companyName,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
@@ -384,7 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ]),
                   const SizedBox(height: 16),
-
+/* 
                   _buildLevelHeader('Niveau 4 — Opérations (à venir)'),
                   _buildHorizontalScrollRow([
                     MetricCardWidget(title: 'STOCKS', value: stockStatus, icon: Icons.store, color: Colors.orange),
@@ -405,16 +434,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     MetricCardWidget(title: 'RECOMMAND.', value: recommendationsCount, icon: Icons.psychology, color: const Color(0xFF1B75BC)),
                     MetricCardWidget(title: 'OPPORTUNITÉS', value: opportunitiesCount, icon: Icons.lightbulb_outline, color: Colors.green),
                   ]),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 24), */
 
                   TextField(
                     controller: _queryController,
+                    onSubmitted: (_) => _envoyerRechercheVersFemi(),
                     decoration: InputDecoration(
                       hintText: "Posez une question sur vos chiffres...",
                       prefixIcon: const Icon(Icons.search, color: Color(0xFF1B75BC)),
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.send, color: Color(0xFF1B75BC)),
-                        onPressed: () {},
+                        onPressed: _envoyerRechercheVersFemi,
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -505,7 +535,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
         onTap: () {
-          _queryController.text = title;
+          // Bascule directement vers l'onglet Femi avec la question comme
+          // prompt initial, pour qu'elle soit envoyée et que Femi réponde
+          // — au lieu de juste remplir la barre de recherche du Dashboard.
+          widget.onNavigateToFemi?.call(title);
         },
       ),
     );

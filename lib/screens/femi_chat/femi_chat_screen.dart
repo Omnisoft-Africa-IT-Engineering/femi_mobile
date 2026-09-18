@@ -9,6 +9,7 @@ import 'widgets/continuer_sur_whatsapp_banner.dart';
 import 'widgets/chat_date_badge_widget.dart';
 import 'widgets/chat_input_bar_widget.dart';
 import 'widgets/chat_message_bubble_widget.dart';
+import 'widgets/chat_history_drawer_widget.dart';
 
 class FemiChatScreen extends StatefulWidget {
   /// Message à envoyer automatiquement à l'agent dès l'ouverture/mise à
@@ -22,13 +23,26 @@ class FemiChatScreen extends StatefulWidget {
   /// didUpdateWidget) qui permet de détecter une nouvelle demande.
   final int promptNonce;
 
-  const FemiChatScreen({super.key, this.initialPrompt, this.promptNonce = 0});
+  /// Appelé quand l'utilisateur appuie sur la flèche de retour de
+  /// l'AppBar. FemiChatScreen est un onglet de MainNavigationScreen
+  /// (IndexedStack), pas un écran empilé via Navigator.push : il n'y a
+  /// donc rien à "pop". Si non fourni (écran utilisé ailleurs, poussé
+  /// directement via Navigator), on retombe sur Navigator.pop classique.
+  final VoidCallback? onBack;
+
+  const FemiChatScreen({
+    super.key,
+    this.initialPrompt,
+    this.promptNonce = 0,
+    this.onBack,
+  });
 
   @override
   State<FemiChatScreen> createState() => _FemiChatScreenState();
 }
 
 class _FemiChatScreenState extends State<FemiChatScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FemiAgentService _agentService = FemiAgentService();
@@ -320,13 +334,36 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF7F9FC),
+      endDrawer: ChatHistoryDrawerWidget(
+        onNouvelleConversation: () {
+          // TODO: quand l'endpoint sera prêt, réinitialiser réellement la
+          // conversation côté backend. Pour l'instant, simple message.
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Nouvelle conversation (bientôt disponible)')),
+          );
+        },
+        onSelectionnerConversation: (item) {
+          // TODO: charger la vraie conversation sélectionnée une fois
+          // l'endpoint d'historique disponible.
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Conversation "${item.title}" (bientôt disponible)')),
+          );
+        },
+      ),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            if (widget.onBack != null) {
+              widget.onBack!();
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
         title: const Row(
           children: [
@@ -345,6 +382,11 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: Colors.black87),
+            tooltip: 'Historique des discussions',
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
+          ),
           IconButton(
             icon: const Icon(
               Icons.notifications_none_outlined,
