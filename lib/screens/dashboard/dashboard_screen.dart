@@ -4,6 +4,7 @@ import 'widgets/ai_recommendation_card_widget.dart';
 import 'widgets/ai_summary_card_widget.dart';
 import 'widgets/metric_card_widget.dart';
 import '../femi_chat/widgets/femi_drawer_widget.dart';
+import '../notifications/notification_bell.dart';
 
 class DashboardScreen extends StatefulWidget {
   /// Appelé quand l'utilisateur veut basculer vers l'agent Femi avec un
@@ -141,13 +142,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             icon: const Icon(Icons.refresh, color: Colors.black87),
             onPressed: _refreshData,
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_outlined,
-              color: Colors.black87,
-            ),
-            onPressed: () {},
-          ),
+          const NotificationBell(),
         ],
       ),
       body: RefreshIndicator(

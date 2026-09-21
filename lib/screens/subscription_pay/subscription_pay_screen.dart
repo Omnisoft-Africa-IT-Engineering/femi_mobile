@@ -4,9 +4,9 @@ import 'widgets/plan_detail_card_widget.dart';
 import 'widgets/plan_tab_widget.dart';
 import '../../states/auth_state.dart';
 import 'widgets/target_feature_banner_widget.dart';
-import '../../services/fedapay_service.dart'; 
+import '../../services/fedapay_service.dart';
 import '../../services/femi_api_service.dart';
-import 'payment_webview_screen.dart'; 
+import 'payment_webview_screen.dart';
 
 class SubscriptionPayScreen extends StatefulWidget {
   final String? targetFeature;
@@ -18,6 +18,7 @@ class SubscriptionPayScreen extends StatefulWidget {
   final String? secteurNom;
   final String? telephoneWhatsapp;
   final String? devise;
+  final String? typeEntreprise;
 
   const SubscriptionPayScreen({
     super.key,
@@ -29,6 +30,7 @@ class SubscriptionPayScreen extends StatefulWidget {
     this.secteurNom,
     this.telephoneWhatsapp,
     this.devise,
+    this.typeEntreprise,
   });
 
   /// true si l'écran est ouvert depuis l'onboarding (juste après le
@@ -109,25 +111,69 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
   /// juste après un paiement FedaPay déjà confirmé — on ne veut pas laisser
   /// l'utilisateur avec un paiement payé mais aucun compte créé à la
   /// première erreur transitoire.
+  ///
+  /// Après chaque échec, on tente aussi de se CONNECTER avec les mêmes
+  /// identifiants : si le serveur a bien créé le compte mais que sa réponse
+  /// ne nous est jamais parvenue (coupure réseau), les tentatives suivantes
+  /// de création répondraient "nom d'utilisateur déjà pris" et
+  /// l'utilisateur resterait bloqué alors que son compte existe.
   Future<bool> _creerCompteAvecRetries(Map<String, dynamic> donnees) async {
     const maxTentatives = 3;
+    final identifiant = donnees['email'] as String;
+    final motDePasse = donnees['password'] as String;
+
     for (var tentative = 1; tentative <= maxTentatives; tentative++) {
       final success = await AuthState.instance.register(
-        username: donnees['email'] as String,
-        password: donnees['password'] as String,
+        username: identifiant,
+        password: motDePasse,
         nomEntreprise: donnees['nomEntreprise'] as String,
         nomComplet: donnees['nomComplet'] as String?,
-        email: donnees['email'] as String,
+        email: identifiant,
         telephoneWhatsapp: donnees['telephoneWhatsapp'] as String?,
         secteurNom: donnees['secteurNom'] as String?,
         devise: donnees['devise'] as String?,
+        typeEntreprise: donnees['typeEntreprise'] as String?,
       );
       if (success) return true;
+
+      // Le compte existe peut-être déjà (réponse perdue) : on essaie de
+      // s'y connecter avant de retenter la création.
+      final dejaCree = await AuthState.instance.login(identifiant, motDePasse);
+      if (dejaCree) {
+        AuthState.instance.errorMessage.value = null;
+        return true;
+      }
+
       if (tentative < maxTentatives) {
         await Future.delayed(Duration(seconds: 2 * tentative));
       }
     }
     return false;
+  }
+
+  /// Met à jour la sauvegarde locale une fois le compte créé (ou, hors
+  /// onboarding, une fois le paiement confirmé).
+  ///
+  /// - Formule activée côté serveur : plus rien à rejouer, on efface tout.
+  /// - Sinon : on conserve de quoi RE-ENVOYER l'activation au prochain
+  ///   démarrage (voir AuthGate), sans le mot de passe, devenu inutile.
+  ///   Sans ça, l'utilisateur qui a payé perdait sa formule dès qu'il
+  ///   redémarrait l'app, puisque le serveur ne l'avait jamais reçue.
+  Future<void> _finaliserSauvegarde(
+    Map<String, dynamic> donnees, {
+    required bool formuleActivee,
+  }) async {
+    if (formuleActivee) {
+      await _apiService.clearPendingRegistration();
+      return;
+    }
+
+    await _apiService.savePendingRegistration({
+      'compteCree': true,
+      'email': donnees['email'],
+      'planTitle': donnees['planTitle'],
+      'transactionId': donnees['transactionId'],
+    });
   }
 
   /// Réessai manuel déclenché depuis l'écran de récupération (bouton
@@ -145,10 +191,13 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     if (success) {
       final planTitle = donnees['planTitle'] as String;
       final transactionId = donnees['transactionId'] as String?;
-      await _activerFormuleCoteServeur(planTitle: planTitle, transactionId: transactionId);
+      final formuleActivee = await _activerFormuleCoteServeur(
+        planTitle: planTitle,
+        transactionId: transactionId,
+      );
       if (!mounted) return;
 
-      await _apiService.clearPendingRegistration();
+      await _finaliserSauvegarde(donnees, formuleActivee: formuleActivee);
 
       setState(() {
         _isLoading = false;
@@ -177,13 +226,15 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
   /// Notifie Django que la formule a été payée (via activatePlan), puis
   /// resynchronise isPro avec le VRAI statut renvoyé par le profil —
-  /// au lieu de simplement le forcer à true côté client. Si l'appel
-  /// réseau à activatePlan échoue (Django injoignable, etc.) alors que
-  /// FedaPay a bien confirmé le paiement, on active quand même isPro en
-  /// local pour ne pas bloquer l'utilisateur qui a réellement payé, mais
-  /// ça reste désynchronisé du serveur tant que la requête n'a pas pu
-  /// être renvoyée avec succès.
-  Future<void> _activerFormuleCoteServeur({
+  /// au lieu de simplement le forcer à true côté client.
+  ///
+  /// Renvoie true si le serveur a bien enregistré l'activation. Si l'appel
+  /// réseau échoue (Django injoignable, etc.) alors que FedaPay a bien
+  /// confirmé le paiement, on active quand même isPro en local pour ne pas
+  /// bloquer l'utilisateur qui a réellement payé, et on renvoie false : à
+  /// l'appelant de conserver de quoi rejouer l'activation plus tard (voir
+  /// _finaliserSauvegarde et AuthGate).
+  Future<bool> _activerFormuleCoteServeur({
     required String planTitle,
     String? transactionId,
   }) async {
@@ -194,14 +245,17 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     if (activated) {
       await AuthState.instance.refreshIsProFromBackend();
-    } else {
-      debugPrint(
-        '⚠️ activatePlan a échoué côté serveur alors que FedaPay a '
-        'confirmé le paiement (transaction_id: $transactionId). '
-        'Activation locale de secours — à re-synchroniser plus tard.',
-      );
-      AuthState.instance.isPro.value = true;
+      return true;
     }
+
+    debugPrint(
+      '⚠️ activatePlan a échoué côté serveur alors que FedaPay a '
+      'confirmé le paiement (transaction_id: $transactionId). '
+      'Activation locale de secours — l\'activation sera renvoyée au '
+      'prochain démarrage de l\'app.',
+    );
+    AuthState.instance.isPro.value = true;
+    return false;
   }
 
   Future<void> _gererPaiement(Map<String, dynamic> selectedPlan) async {
@@ -294,6 +348,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         'telephoneWhatsapp': widget.telephoneWhatsapp,
         'secteurNom': widget.secteurNom,
         'devise': widget.devise ?? 'FCFA',
+        'typeEntreprise': widget.typeEntreprise,
         'planTitle': planTitle,
         'transactionId': result.transactionId,
       };
@@ -310,14 +365,16 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         // Le compte vient d'être créé avec la formule payée : on notifie
         // Django (activatePlan) puis on resynchronise isPro depuis le
         // vrai profil, au lieu de le forcer en local.
-        await _activerFormuleCoteServeur(
+        final formuleActivee = await _activerFormuleCoteServeur(
           planTitle: planTitle,
           transactionId: result.transactionId,
         );
 
         if (!mounted) return;
 
-        await _apiService.clearPendingRegistration();
+        // On n'efface la sauvegarde QUE si le serveur a bien enregistré
+        // la formule ; sinon elle sert à rejouer l'activation au démarrage.
+        await _finaliserSauvegarde(donnees, formuleActivee: formuleActivee);
         setState(() => _isLoading = false);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -350,10 +407,20 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     // Cas normal (ouvert depuis CompteScreen, compte déjà existant) :
     // on notifie Django puis on resynchronise isPro depuis le vrai profil.
-    await _activerFormuleCoteServeur(
-      planTitle: selectedPlan['title'] as String,
+    final planTitle = selectedPlan['title'] as String;
+    final formuleActivee = await _activerFormuleCoteServeur(
+      planTitle: planTitle,
       transactionId: result.transactionId,
     );
+
+    // Si le serveur n'a pas enregistré l'activation, on garde de quoi la
+    // renvoyer au prochain démarrage (voir AuthGate).
+    if (!formuleActivee) {
+      await _finaliserSauvegarde(
+        {'planTitle': planTitle, 'transactionId': result.transactionId},
+        formuleActivee: false,
+      );
+    }
 
     if (!mounted) return;
 

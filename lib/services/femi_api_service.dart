@@ -5,8 +5,19 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Service centralisant tous les appels vers le backend Django de Femi.
 class FemiApiService {
+  // Hôte commun aux deux préfixes d'API utilisés par le backend :
+  // - api/v1/...   (apps.femi_api)
+  // - api/auth/... (apps.femi_account — échéances fiscales, register/login JWT)
+  static const String _host = 'https://shore-handiwork-croon.ngrok-free.dev';
+
   // Utilisation du loopback local pour le dev Web (Chrome)
-  static const String baseUrl = 'https://shore-handiwork-croon.ngrok-free.dev/api/v1';
+  static const String baseUrl = '$_host/api/v1';
+
+  // Base URL pour les endpoints montés sous apps.femi_account
+  // (voir core/urls.py : path('api/auth/', include('apps.femi_account.urls'))).
+  // C'est ici que vivent les échéances fiscales, PAS sous /api/v1/.
+  static const String authBaseUrl = '$_host/api/auth';
+
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
   // En-têtes HTTP requis pour communiquer avec Django
@@ -71,6 +82,10 @@ class FemiApiService {
     String? telephoneWhatsapp,
     String? secteurNom,
     String? devise,
+    // Forme juridique de l'entreprise — valeurs attendues côté Django :
+    // 'INDIVIDUEL', 'SARL', 'SA', 'AUTRE' (voir Entreprise.TYPE_ENTREPRISE_CHOICES).
+    // Sert à déterminer plus tard les échéances fiscales applicables.
+    String? typeEntreprise,
   }) async {
     try {
       final response = await http.post(
@@ -86,6 +101,8 @@ class FemiApiService {
             'telephone_whatsapp': telephoneWhatsapp,
           if (secteurNom != null && secteurNom.isNotEmpty) 'secteur_nom': secteurNom,
           if (devise != null && devise.isNotEmpty) 'devise': devise,
+          if (typeEntreprise != null && typeEntreprise.isNotEmpty)
+            'type_entreprise': typeEntreprise,
         }),
       );
 
@@ -445,9 +462,6 @@ class FemiApiService {
   // --- 14. Obtenir la configuration publique (GET /api/v1/config/) ---
   // Pas besoin de token : endpoint public, utilisé pour récupérer le
   // numéro WhatsApp Business de Femi (bouton "Continuer sur WhatsApp").
-  // --- 14. Obtenir la configuration publique (GET /api/v1/config/) ---
-  // Pas besoin de token : endpoint public, utilisé pour récupérer le
-  // numéro WhatsApp Business de Femi (bouton "Continuer sur WhatsApp").
   Future<Map<String, dynamic>?> getAppConfig() async {
     try {
       final response = await http.get(
@@ -489,5 +503,232 @@ class FemiApiService {
 
   Future<void> clearPendingRegistration() async {
     await _storage.delete(key: _pendingRegistrationKey);
-  } 
+  }
+
+  // --- 16. Obtenir les échéances fiscales (GET /api/auth/echeances-fiscales/) ---
+  // ⚠️ Cet endpoint vit sous authBaseUrl (api/auth/), PAS baseUrl (api/v1/) —
+  // voir core/urls.py : path('api/auth/', include('apps.femi_account.urls')).
+  // Renvoie la liste brute (pas de pagination DRF activée globalement),
+  // mais on gère quand même le cas {"results": [...]} par sécurité si la
+  // pagination est ajoutée un jour côté backend.
+  Future<List<dynamic>?> getEcheancesFiscales() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$authBaseUrl/echeances-fiscales/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is List) {
+          return data;
+        } else if (data is Map && data.containsKey('results')) {
+          return data['results'] as List<dynamic>;
+        }
+        return null;
+      } else {
+        debugPrint('Erreur HTTP Échéances Fiscales: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération des échéances fiscales: $e');
+      return null;
+    }
+  }
+
+  // --- 17. Marquer une échéance fiscale comme payée
+  //          (POST /api/auth/echeances-fiscales/{id}/marquer_paye/) ---
+  // 'id' est un int côté Django (EcheanceFiscale n'a pas de PK UUID
+  // explicite comme les autres modèles) — on l'accepte en String ici
+  // pour rester flexible si ça change plus tard, et on l'interpole tel
+  // quel dans l'URL.
+  Future<bool> marquerEcheancePayee(String id) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$authBaseUrl/echeances-fiscales/$id/marquer_paye/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        debugPrint('Erreur HTTP Marquer Échéance Payée: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors du marquage de l\'échéance comme payée: $e');
+      return false;
+    }
+  }
+
+  // ============================================================
+  // À COLLER dans FemiApiService, juste après la méthode 17
+  // (marquerEcheancePayee), avant l'accolade fermante de la classe.
+  //
+  // Comme les échéances fiscales, les notifications vivent sous
+  // authBaseUrl (api/auth/) : apps.femi_account.urls.
+  // ============================================================
+
+  // --- 18. Obtenir les notifications (GET /api/auth/notifications/) ---
+  // On décode via bodyBytes en UTF-8 pour ne jamais altérer les accents
+  // et tirets longs des titres/messages, quel que soit le Content-Type.
+  Future<List<dynamic>?> getNotifications() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$authBaseUrl/notifications/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data is List) {
+          return data;
+        } else if (data is Map && data.containsKey('results')) {
+          return data['results'] as List<dynamic>;
+        }
+        return null;
+      } else {
+        debugPrint('Erreur HTTP Notifications: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération des notifications: $e');
+      return null;
+    }
+  }
+
+  // --- 19. Nombre de notifications non lues (GET /api/auth/notifications/non-lues/) ---
+  // Renvoie null en cas d'erreur pour que la cloche garde son dernier
+  // compteur connu au lieu de retomber à 0.
+  Future<int?> getNombreNotificationsNonLues() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$authBaseUrl/notifications/non-lues/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data is Map && data['count'] is int) {
+          return data['count'] as int;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération du compteur de notifications: $e');
+      return null;
+    }
+  }
+
+  // --- 20. Marquer une notification comme lue
+  //          (POST /api/auth/notifications/{id}/lue/) ---
+  Future<bool> marquerNotificationLue(String id) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$authBaseUrl/notifications/$id/lue/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 204 || response.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Erreur HTTP Notification Lue: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors du marquage de la notification comme lue: $e');
+      return false;
+    }
+  }
+
+  // --- 21. Tout marquer comme lu (POST /api/auth/notifications/tout-lire/) ---
+  Future<bool> marquerToutesNotificationsLues() async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$authBaseUrl/notifications/tout-lire/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Erreur HTTP Tout Lire: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors du marquage de toutes les notifications: $e');
+      return false;
+    }
+  }
+
+  // --- 22. Enregistrer l'appareil pour les push
+  //          (POST /api/auth/notifications/appareils/) ---
+  // fcmToken : token Firebase de l'appareil (à ne pas confondre avec le
+  // token d'authentification Django, lu ici via getToken()).
+  // plateforme : 'ANDROID' ou 'IOS'.
+  Future<bool> enregistrerAppareil(String fcmToken, String plateforme) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$authBaseUrl/notifications/appareils/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'token': fcmToken,
+          'plateforme': plateforme,
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Erreur HTTP Enregistrement Appareil: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors de l\'enregistrement de l\'appareil: $e');
+      return false;
+    }
+  }
+
+  // --- 23. Supprimer l'appareil (DELETE /api/auth/notifications/appareils/) ---
+  // À appeler AVANT logout() : la requête a besoin du token d'authentification.
+  Future<bool> supprimerAppareil(String fcmToken) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$authBaseUrl/notifications/appareils/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({'token': fcmToken}),
+      );
+
+      if (response.statusCode == 204 || response.statusCode == 200) {
+        return true;
+      }
+      debugPrint('Erreur HTTP Suppression Appareil: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors de la suppression de l\'appareil: $e');
+      return false;
+    }
+  }
+
 }

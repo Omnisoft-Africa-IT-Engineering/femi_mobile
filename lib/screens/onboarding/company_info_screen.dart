@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../subscription_pay/subscription_pay_screen.dart'; // ⚠️ ajustez ce chemin selon votre arborescence réelle
+import '../subscription_pay/subscription_pay_screen.dart'; 
 
 /// Étape 2 de l'onboarding — Informations sur l'entreprise.
 /// Ne crée plus le compte directement : redirige vers SubscriptionPayScreen,
@@ -67,6 +67,21 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
     super.dispose();
   }
 
+  /// Convertit le libellé affiché dans le dropdown vers le code attendu
+  /// par Django (Entreprise.TYPE_ENTREPRISE_CHOICES : INDIVIDUEL/SARL/SA/AUTRE).
+  String _convertirFormeJuridiqueVersCode(String formeJuridique) {
+    switch (formeJuridique) {
+      case 'Entreprise individuelle':
+        return 'INDIVIDUEL';
+      case 'SARL':
+        return 'SARL';
+      case 'SA':
+        return 'SA';
+      default:
+        return 'AUTRE';
+    }
+  }
+
   /// Valide le formulaire puis ouvre l'écran d'abonnement/paiement.
   /// La création du compte (AuthState.instance.register) ne se fait plus
   /// ici : c'est SubscriptionPayScreen qui s'en charge une fois le
@@ -83,6 +98,20 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       return;
     }
 
+    // Requis pour FedaPay (Mobile Money) au moment du paiement — mieux
+    // vaut bloquer ici que de laisser échouer l'appel de paiement plus
+    // loin dans le flux, avec un message d'erreur moins clair.
+    final telephone = _telephoneController.text.trim();
+    if (telephone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le numéro de téléphone est requis pour le paiement'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SubscriptionPayScreen(
@@ -91,10 +120,9 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
           password: widget.password,
           nomEntreprise: nomEntreprise,
           secteurNom: _secteurActivite,
-          telephoneWhatsapp: _telephoneController.text.trim().isEmpty
-              ? null
-              : _telephoneController.text.trim(),
+          telephoneWhatsapp: telephone,
           devise: _devise,
+          typeEntreprise: _convertirFormeJuridiqueVersCode(_formeJuridique),
         ),
       ),
     );
@@ -305,7 +333,7 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 const SizedBox(height: 20),
 
                 const Text(
-                  'Numéro de téléphone',
+                  'Numéro de téléphone *',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,

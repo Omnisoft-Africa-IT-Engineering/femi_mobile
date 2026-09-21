@@ -6,6 +6,7 @@ import '../../etat_financier/etat_financier_screen.dart';
 import '../../balance_generale/balance_generale_screen.dart';
 import '../../balance_auxiliaire/balance_auxiliaire_screen.dart';
 import '../../grand_livre/grand_livre_screen.dart';
+import '../../echeances_fiscales/echeances_fiscales_screen.dart';
 
 /// Menu latéral (Drawer) partagé, ouvrable depuis n'importe quel onglet
 /// de MainNavigationScreen (Tableau de bord = 0, Chat Femi = 1,
@@ -113,6 +114,12 @@ class FemiDrawerWidget extends StatelessWidget {
                     label: 'Tableau de bord',
                     selected: currentTabIndex == tabDashboard,
                     onTap: () => _fermerPuisNaviguerVersOnglet(context, tabDashboard),
+                  ),
+                  _item(
+                    context,
+                    icon: Icons.event_note_outlined,
+                    label: 'Échéances fiscales',
+                    onTap: () => _fermerPuisPousser(context, const EcheancesFiscalesScreen()),
                   ),
                   _item(
                     context,

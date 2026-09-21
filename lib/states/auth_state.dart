@@ -132,6 +132,9 @@ class AuthState {
     String? telephoneWhatsapp,
     String? secteurNom,
     String? devise,
+    // Forme juridique — INDIVIDUEL/SARL/SA/AUTRE — relayée telle quelle
+    // à FemiApiService.register(), qui l'inclut dans le body si fournie.
+    String? typeEntreprise,
   }) async {
     isLoading.value = true;
     errorMessage.value = null;
@@ -145,6 +148,7 @@ class AuthState {
       telephoneWhatsapp: telephoneWhatsapp,
       secteurNom: secteurNom,
       devise: devise,
+      typeEntreprise: typeEntreprise,
     );
 
     isLoading.value = false;
