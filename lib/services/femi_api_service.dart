@@ -8,7 +8,7 @@ class FemiApiService {
   // Hôte commun aux deux préfixes d'API utilisés par le backend :
   // - api/v1/...   (apps.femi_api)
   // - api/auth/... (apps.femi_account — échéances fiscales, register/login JWT)
-  static const String _host = 'https://shore-handiwork-croon.ngrok-free.dev';
+  static const String _host = 'https://mon-api-django-supabase.onrender.com';
 
   // Utilisation du loopback local pour le dev Web (Chrome)
   static const String baseUrl = '$_host/api/v1';
@@ -125,6 +125,49 @@ class FemiApiService {
       }
     } catch (e) {
       debugPrint('Erreur lors de l\'inscription: $e');
+      return false;
+    }
+  }
+
+  // --- 1ter. Connexion Google (POST /api/auth/public/google-login/) ---
+  // Envoie l'idToken Google au backend. Accepte soit un Token DRF
+  // ("token"), soit des JWT SimpleJWT ("tokens.access" / "access").
+  Future<bool> googleLogin(String idToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$authBaseUrl/public/google-login/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({'id_token': idToken}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+
+        // Compatible Token DRF ET SimpleJWT
+        final token = data['token'] ??
+            data['tokens']?['access'] ??
+            data['access'] ??
+            data['key'];
+
+        if (token != null) {
+          await _storage.write(key: 'auth_token', value: token.toString());
+
+          final companyName = data['entreprise_nom'] ??
+              data['company_name'] ??
+              data['username'] ??
+              'Mon Entreprise';
+          await _storage.write(key: 'company_name', value: companyName.toString());
+
+          return true;
+        }
+      }
+
+      debugPrint(
+        'Google login failed: ${response.statusCode} - ${response.body}',
+      );
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors du login Google: $e');
       return false;
     }
   }

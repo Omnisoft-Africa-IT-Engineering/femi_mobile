@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart'; // Pour defaultTargetPlatform
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Pour récupérer le token FCM
+import '../../services/femi_api_service.dart'; // Ajuste selon ton chemin si besoin
 import '../../states/auth_state.dart';
 import '../auth/sign_up_screen.dart';
 
@@ -27,6 +30,19 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Méthode d'enregistrement du token FCM auprès de Django
+  Future<void> _registerFcmDevice() async {
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        String plateforme = defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+        await FemiApiService().enregistrerAppareil(fcmToken, plateforme);
+      }
+    } catch (e) {
+      debugPrint("Erreur lors de l'enregistrement de l'appareil FCM après login : $e");
+    }
+  }
+
   Future<void> _handleLogin() async {
     final username = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -46,6 +62,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
+      // Connexion réussie -> Enregistrement du device FCM côté backend
+      await _registerFcmDevice();
+
+      if (!mounted) return;
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -61,7 +81,33 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- Handlers pour la connexion via Réseaux Sociaux ---
+  Future<void> _handleGoogleLogin() async {
+    final success = await AuthState.instance.loginWithGoogle();
+
+    if (!mounted) return;
+
+    if (success) {
+      // Connexion Google réussie -> Enregistrement du device FCM côté backend
+      await _registerFcmDevice();
+
+      if (!mounted) return;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      final msg = AuthState.instance.errorMessage.value;
+      // Si msg est null → l'utilisateur a juste annulé, on ne montre rien
+      if (msg != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _handleSocialLogin(String provider) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -70,7 +116,7 @@ class _LoginScreenState extends State<LoginScreen> {
         duration: const Duration(seconds: 2),
       ),
     );
-    // TODO: Connecter ici votre logique Google / Telegram / Apple OAuth
+    // TODO: Telegram / Apple plus tard
   }
 
   @override
@@ -244,36 +290,45 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // --- SECTION BOUTONS SOCIAUX (Google, Telegram, Apple) ---
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Google
-                    _buildSocialButton(
-                      label: 'Google',
-                      icon: Icons.g_mobiledata_rounded,
-                      iconColor: const Color(0xFFEA4335),
-                      onPressed: () => _handleSocialLogin('Google'),
-                    ),
-                    const SizedBox(width: 14),
+                // --- SECTION BOUTONS SOCIAUX ---
+                ValueListenableBuilder<bool>(
+                  valueListenable: AuthState.instance.isLoading,
+                  builder: (context, isLoading, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Google (fonctionnel)
+                        _buildSocialButton(
+                          label: 'Google',
+                          icon: Icons.g_mobiledata_rounded,
+                          iconColor: const Color(0xFFEA4335),
+                          onPressed: isLoading ? null : _handleGoogleLogin,
+                        ),
+                        const SizedBox(width: 14),
 
-                    // Telegram
-                    _buildSocialButton(
-                      label: 'Telegram',
-                      icon: Icons.send_rounded,
-                      iconColor: const Color(0xFF0088CC),
-                      onPressed: () => _handleSocialLogin('Telegram'),
-                    ),
-                    const SizedBox(width: 14),
+                        // Telegram (placeholder)
+                        _buildSocialButton(
+                          label: 'Telegram',
+                          icon: Icons.send_rounded,
+                          iconColor: const Color(0xFF0088CC),
+                          onPressed: isLoading
+                              ? null
+                              : () => _handleSocialLogin('Telegram'),
+                        ),
+                        const SizedBox(width: 14),
 
-                    // Apple
-                    _buildSocialButton(
-                      label: 'Apple',
-                      icon: Icons.apple_rounded,
-                      iconColor: Colors.black,
-                      onPressed: () => _handleSocialLogin('Apple'),
-                    ),
-                  ],
+                        // Apple (placeholder)
+                        _buildSocialButton(
+                          label: 'Apple',
+                          icon: Icons.apple_rounded,
+                          iconColor: Colors.black,
+                          onPressed: isLoading
+                              ? null
+                              : () => _handleSocialLogin('Apple'),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 28),
 
@@ -315,7 +370,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Widget helper pour les champs de saisie
   Widget _buildInputField({
     required TextEditingController controller,
     required String hint,
@@ -349,12 +403,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Widget helper pour les boutons des réseaux sociaux
   Widget _buildSocialButton({
     required String label,
     required IconData icon,
     required Color iconColor,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
   }) {
     return Expanded(
       child: InkWell(

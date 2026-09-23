@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/femi_api_service.dart';
-// ⚠️ ajustez ce chemin selon votre arborescence réelle
+// ⚠️ Ajuste cet import selon ton arborescence réelle si nécessaire
 import '../echeances_fiscales/echeances_fiscales_screen.dart';
 
 /// Centre de notifications : liste des rappels d'échéances fiscales reçus.
-///
-/// Suit les mêmes conventions visuelles que EcheancesFiscalesScreen
-/// (fond F8F9FE, vert primaire 006654, cartes blanches bordées E2E8F0).
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -42,7 +39,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     setState(() {
       _chargement = false;
       if (donnees == null) {
-        // On garde la liste déjà affichée si un rafraîchissement échoue.
         _erreur = _notifications.isEmpty;
       } else {
         _erreur = false;
@@ -88,7 +84,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     final DateTime maintenant = DateTime.now();
-    final DateTime aujourdhui = DateTime(maintenant.year, maintenant.month, maintenant.day);
+    final DateTime aujourdhui =
+        DateTime(maintenant.year, maintenant.month, maintenant.day);
     final DateTime jour = DateTime(date.year, date.month, date.day);
     final int ecart = aujourdhui.difference(jour).inDays;
     final String heure =
@@ -105,16 +102,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _ouvrir(Map<String, dynamic> notification) async {
+    // 1. Marquage comme lu en local puis sur le serveur
     if (notification['lue'] != true) {
-      // Mise à jour immédiate à l'écran ; le serveur suit en arrière-plan.
       setState(() => notification['lue'] = true);
       _apiService.marquerNotificationLue(notification['id'].toString());
     }
 
-    if (notification['echeance'] != null) {
+    // 2. Redirection vers l'écran des échéances fiscales
+    if (notification['echeance'] != null || notification['echeance_id'] != null) {
+      final dynamic echeanceTarget = notification['echeance'] ?? notification['echeance_id'];
+      
+      if (!mounted) return;
       await Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const EcheancesFiscalesScreen()),
+        MaterialPageRoute(
+          builder: (_) => const EcheancesFiscalesScreen(),
+          // Si ton EcheancesFiscalesScreen accepte un ID d'échéance à cibler :
+          // builder: (_) => EcheancesFiscalesScreen(echeanceId: echeanceTarget.toString()),
+        ),
       );
     }
   }
@@ -152,12 +157,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         backgroundColor: const Color(0xFFF8F9FE),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF0F172A), size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              color: Color(0xFF0F172A), size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Notifications',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A)),
         ),
         centerTitle: false,
         actions: [
@@ -166,7 +175,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               onPressed: _toutLireEnCours ? null : _toutMarquerLu,
               child: const Text(
                 'Tout marquer comme lu',
-                style: TextStyle(color: Color(0xFF006654), fontWeight: FontWeight.w600),
+                style: TextStyle(
+                    color: Color(0xFF006654), fontWeight: FontWeight.w600),
               ),
             ),
         ],
@@ -200,12 +210,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 60.0),
         children: const [
-          Icon(Icons.notifications_none_rounded, size: 48, color: Color(0xFF94A3B8)),
+          Icon(Icons.notifications_none_rounded,
+              size: 48, color: Color(0xFF94A3B8)),
           SizedBox(height: 12),
           Text(
             'Aucune notification pour le moment.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0F172A)),
           ),
           SizedBox(height: 6),
           Text(
@@ -242,8 +256,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Center(
           child: ElevatedButton(
             onPressed: _charger,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF006654)),
-            child: const Text('Réessayer', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF006654)),
+            child:
+                const Text('Réessayer', style: TextStyle(color: Colors.white)),
           ),
         ),
       ],
@@ -258,7 +274,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final RoundedRectangleBorder forme = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(12),
       side: BorderSide(
-        color: lue ? const Color(0xFFE2E8F0) : const Color(0xFF006654).withOpacity(0.4),
+        color: lue
+            ? const Color(0xFFE2E8F0)
+            : const Color(0xFF006654).withOpacity(0.4),
       ),
     );
 
@@ -295,7 +313,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             (notification['titre'] ?? '').toString(),
                             style: TextStyle(
                               fontSize: 15,
-                              fontWeight: lue ? FontWeight.w600 : FontWeight.bold,
+                              fontWeight:
+                                  lue ? FontWeight.w600 : FontWeight.bold,
                               color: const Color(0xFF0F172A),
                             ),
                           ),
@@ -315,12 +334,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       (notification['message'] ?? '').toString(),
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      style: const TextStyle(
+                          fontSize: 13, color: Color(0xFF64748B)),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _formatRelatif(notification['created_at'] as String?),
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF94A3B8)),
                     ),
                   ],
                 ),

@@ -15,6 +15,9 @@ dependencies:
   printing: ^5.13.4
   http: ^1.6.0
   flutter_secure_storage: ^11.0.0
+  google_sign_in: ^6.2.2
+  firebase_core: ^3.0.0
+  firebase_messaging: ^15.0.0
 
   # Nouveaux packages ajoutés pour le Chat Femi (Audio, Images, Multipart)
   http_parser: ^4.0.2

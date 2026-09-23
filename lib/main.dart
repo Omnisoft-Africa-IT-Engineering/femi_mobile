@@ -1,14 +1,72 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+import 'package:flutter/foundation.dart'; // Add this import at the top
+import 'services/femi_api_service.dart';   // Adjust to your actual path
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
 import 'screens/subscription_pay/subscription_pay_screen.dart';
 import 'screens/auth/auth_gate.dart';
 
-void main() {
+// ⚠️ Ajuste ce chemin selon l'emplacement exact de notification_events.dart dans ton projet
+import 'screens/notifications/notification_events.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  // Initialisation et écoute FCM
+  await _setupFcmToken();
+
   runApp(const FemiApp());
 }
 
+Future<void> _setupFcmToken() async {
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  await messaging.setForegroundNotificationPresentationOptions(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+  alert: true,
+  badge: true,
+  sound: true,
+);
+
+  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+    String? token = await messaging.getToken();
+    debugPrint("==================================================");
+    debugPrint("MON TOKEN FCM : $token");
+    debugPrint("==================================================");
+
+    if (token != null) {
+      // 1. On détecte la plateforme (IOS ou ANDROID)
+      String plateforme = defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+
+      // 2. On envoie le token au backend via la méthode 22 de ton service
+      bool succes = await FemiApiService().enregistrerAppareil(token, plateforme);
+      if (succes) {
+        debugPrint("✅ Appareil enregistré avec succès dans le backend.");
+      } else {
+        debugPrint("⚠️ Échec de l'enregistrement (l'utilisateur n'est peut-être pas encore connecté).");
+      }
+    }
+
+    // 3. Écoute des messages quand l'application est ouverte
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint("Message FCM reçu au premier plan : ${message.notification?.title}");
+      NotificationEvents.nouvelleNotification.value++;
+    });
+
+  } else {
+    debugPrint("Permission notification refusée par l'utilisateur.");
+  }
+}
 class FemiApp extends StatelessWidget {
   const FemiApp({super.key});
 
@@ -51,11 +109,6 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  // --- Basculement vers Femi avec un prompt contextuel ---
-  // `_femiPromptNonce` change à chaque déclenchement, même si le texte
-  // du prompt est identique à la fois précédente : c'est ce qui permet à
-  // FemiChatScreen (gardé en vie par l'IndexedStack) de détecter qu'un
-  // NOUVEL envoi est demandé, via didUpdateWidget.
   String? _pendingFemiPrompt;
   int _femiPromptNonce = 0;
 
@@ -67,11 +120,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     });
   }
 
-  // --- Basculement d'onglet demandé depuis un écran enfant ---
-  // Utilisé par le Drawer de FemiChatScreen pour "Tableau de bord" et
-  // "Compte", qui sont des onglets de cet IndexedStack, pas des écrans
-  // indépendants qu'on peut simplement empiler par-dessus. Aussi utilisé
-  // par la flèche de retour de FemiChatScreen (voir onBack ci-dessous).
   void _switchToTab(int index) {
     setState(() => _currentIndex = index);
   }
@@ -84,11 +132,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         FemiChatScreen(
           initialPrompt: _pendingFemiPrompt,
           promptNonce: _femiPromptNonce,
-          // Comme MainNavigationScreen est l'unique route de l'app (les
-          // onglets ne sont que des index d'IndexedStack, pas des routes
-          // Navigator séparées), la flèche de retour de l'AppBar ne peut
-          // pas faire un Navigator.pop classique — il n'y a rien à
-          // dépiler. On lui dit explicitement de revenir au Dashboard.
           onBack: () => _switchToTab(0),
         ),
         const CompteScreen(),
@@ -97,12 +140,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // On n'autorise la fermeture réelle de l'app (pop du dernier écran)
-      // que si on est déjà sur l'onglet Dashboard (index 0). Sinon, on
-      // intercepte le retour (bouton système Android / bouton retour du
-      // navigateur Chrome) pour revenir au Dashboard au lieu de laisser
-      // Flutter tenter de fermer l'app, ce qui provoquait l'écran
-      // noir/blanc observé.
       canPop: _currentIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
