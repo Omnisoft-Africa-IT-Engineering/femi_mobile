@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class FemiAgentService {
-  /// URL Ngrok unifiée pour la communication mobile et web
+  /// URL de base du backend Django déployé sur Render.
   static const String baseUrl = 'https://mon-api-django-supabase.onrender.com';
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
@@ -36,12 +36,18 @@ class FemiAgentService {
     Uint8List? audioBytes,
   }) async {
     // URL finale : https://mon-api-django-supabase.onrender.com/api/v1/transactions/process/
-    final uri = Uri.parse('$baseUrl/v1/transactions/process/');
+    // ⚠️ CORRIGÉ : il manquait le préfixe "/api" devant "/v1/", ce qui
+    // donnait "$baseUrl/v1/transactions/process/" — une URL qui ne
+    // correspond à aucune route de core/urls.py (tout est monté sous
+    // "api/v1/..."), d'où le 404 systématique malgré une route backend
+    // pourtant valide et fonctionnelle.
+    final uri = Uri.parse('$baseUrl/api/v1/transactions/process/');
     var request = http.MultipartRequest('POST', uri);
 
     // 0. Header requis pour contourner la page d'avertissement ngrok
     // (sinon ngrok renvoie une page HTML sans headers CORS et le
-    // navigateur bloque la réponse comme une erreur CORS).
+    // navigateur bloque la réponse comme une erreur CORS). Inoffensif
+    // sur Render, qui l'ignore simplement.
     request.headers['ngrok-skip-browser-warning'] = 'true';
 
     // 1. Récupération et nettoyage du Token d'authentification

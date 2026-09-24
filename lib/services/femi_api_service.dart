@@ -129,49 +129,97 @@ class FemiApiService {
     }
   }
 
-  // --- 1ter. Connexion Google (POST /api/auth/public/google-login/) ---
-  // Envoie l'idToken Google au backend. Accepte soit un Token DRF
-  // ("token"), soit des JWT SimpleJWT ("tokens.access" / "access").
-  Future<bool> googleLogin(String idToken) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$authBaseUrl/public/google-login/'),
-        headers: _buildHeaders(),
-        body: jsonEncode({'id_token': idToken}),
-      );
+// --- 1ter. Connexion / pré-inscription Google ---
+//
+// POST /api/auth/public/google-login/
+//
+// Si l'utilisateur existe déjà :
+//   {
+//     "is_new_user": false,
+//     "tokens": {...}
+//   }
+//
+// Si l'utilisateur est nouveau :
+//   {
+//     "is_new_user": true,
+//     "google_data": {
+//       "email": "...",
+//       "full_name": "...",
+//       "picture": "...",
+//       "google_sub": "..."
+//     }
+//   }
+//
+// IMPORTANT :
+// Pour un nouvel utilisateur, aucun token Django n'est stocké.
+// Le compte sera créé après validation du formulaire d'inscription.
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
+Future<Map<String, dynamic>?> googleLogin(String idToken) async {
+  try {
+    final response = await http.post(
+      Uri.parse('$authBaseUrl/public/google-login/'),
+      headers: _buildHeaders(),
+      body: jsonEncode({
+        'id_token': idToken,
+      }),
+    );
 
-        // Compatible Token DRF ET SimpleJWT
-        final token = data['token'] ??
-            data['tokens']?['access'] ??
-            data['access'] ??
-            data['key'];
+    final responseBody = utf8.decode(response.bodyBytes);
 
-        if (token != null) {
-          await _storage.write(key: 'auth_token', value: token.toString());
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = jsonDecode(responseBody) as Map<String, dynamic>;
 
-          final companyName = data['entreprise_nom'] ??
-              data['company_name'] ??
-              data['username'] ??
-              'Mon Entreprise';
-          await _storage.write(key: 'company_name', value: companyName.toString());
+      final isNewUser = data['is_new_user'] == true;
 
-          return true;
-        }
+      // ==========================================================
+      // NOUVEL UTILISATEUR
+      // ==========================================================
+
+      if (isNewUser) {
+        debugPrint('🆕 Nouvel utilisateur Google détecté.');
+
+        return data;
       }
 
-      debugPrint(
-        'Google login failed: ${response.statusCode} - ${response.body}',
-      );
-      return false;
-    } catch (e) {
-      debugPrint('Erreur lors du login Google: $e');
-      return false;
-    }
-  }
+      // ==========================================================
+      // UTILISATEUR EXISTANT
+      // ==========================================================
 
+      final token = data['token'] ??
+          data['tokens']?['access'] ??
+          data['access'] ??
+          data['key'];
+
+      if (token != null) {
+        await _storage.write(
+          key: 'auth_token',
+          value: token.toString(),
+        );
+
+        final companyName = data['entreprise_nom'] ??
+            data['company_name'] ??
+            data['username'] ??
+            'Mon Entreprise';
+
+        await _storage.write(
+          key: 'company_name',
+          value: companyName.toString(),
+        );
+      }
+
+      return data;
+    }
+
+    debugPrint(
+      'Google login failed: ${response.statusCode} - $responseBody',
+    );
+
+    return null;
+  } catch (e) {
+    debugPrint('Erreur lors du login Google: $e');
+    return null;
+  }
+}
   // --- 2. Récupérer le nom de l'entreprise ---
   Future<String> getCompanyName() async {
     final localName = await _storage.read(key: 'company_name');

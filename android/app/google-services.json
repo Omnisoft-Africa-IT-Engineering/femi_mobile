@@ -12,7 +12,20 @@
           "package_name": "com.example.femi_mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "924074246865-5n7cjopge91jhsbet89gkqb7ene2crn0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.femi_mobile",
+            "certificate_hash": "e6e62fa7e9f7e25067e5617c3b2375156bf93c8d"
+          }
+        },
+        {
+          "client_id": "924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBnzlrN4UHtmJpmsZD7ffWy1TVXGcYdALI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

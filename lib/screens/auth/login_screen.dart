@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart'; // Pour récupérer le token FCM
 import '../../services/femi_api_service.dart'; // Ajuste selon ton chemin si besoin
 import '../../states/auth_state.dart';
+import '../onboarding/company_info_screen.dart';
 import '../auth/sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -81,33 +82,116 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleGoogleLogin() async {
-    final success = await AuthState.instance.loginWithGoogle();
+Future<void> _handleGoogleLogin() async {
+  final result = await AuthState.instance.loginWithGoogle();
+
+  if (!mounted) return;
+
+  // ==========================================================
+  // GOOGLE ANNULÉ OU ERREUR
+  // ==========================================================
+
+  if (result['success'] != true) {
+    final msg = AuthState.instance.errorMessage.value;
+
+    if (msg != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+
+    return;
+  }
+
+  // ==========================================================
+  // NOUVEL UTILISATEUR GOOGLE
+  // ==========================================================
+
+  if (result['is_new_user'] == true) {
+    final googleData =
+        result['google_data'] as Map<String, dynamic>?;
+
+    if (googleData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Informations Google manquantes.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final email =
+        (googleData['email'] ?? '').toString();
+
+    final fullName =
+        (googleData['full_name'] ?? '').toString();
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Impossible de récupérer votre adresse email Google.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Pour le moment, on utilise le nom complet
+    // comme nom initial de l'entreprise.
+    final nomEntrepriseInitial =
+        fullName.isNotEmpty ? fullName : 'Mon entreprise';
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CompanyInfoScreen(
+          nomComplet: fullName,
+          nomEntrepriseInitial: nomEntrepriseInitial,
+          email: email,
+          password: null,
+        ),
+      ),
+    );
+
+    return;
+  }
+
+  // ==========================================================
+  // UTILISATEUR GOOGLE EXISTANT
+  // ==========================================================
+
+  if (result['is_new_user'] == false) {
+    await _registerFcmDevice();
 
     if (!mounted) return;
 
-    if (success) {
-      // Connexion Google réussie -> Enregistrement du device FCM côté backend
-      await _registerFcmDevice();
-
-      if (!mounted) return;
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-    } else {
-      final msg = AuthState.instance.errorMessage.value;
-      // Si msg est null → l'utilisateur a juste annulé, on ne montre rien
-      if (msg != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
     }
+
+    return;
   }
 
+  // ==========================================================
+  // RÉPONSE INATTENDUE
+  // ==========================================================
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text(
+        'Réponse inattendue du serveur.',
+      ),
+      backgroundColor: Colors.red,
+    ),
+  );
+}
   void _handleSocialLogin(String provider) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
