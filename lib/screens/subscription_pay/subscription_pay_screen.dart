@@ -35,7 +35,8 @@ class SubscriptionPayScreen extends StatefulWidget {
 
   /// true si l'écran est ouvert depuis l'onboarding (juste après le
   /// formulaire "Votre entreprise") plutôt que depuis CompteScreen.
-  bool get isOnboarding => email != null && password != null && nomEntreprise != null;
+  bool get isOnboarding =>
+    email != null && nomEntreprise != null;
 
   @override
   State<SubscriptionPayScreen> createState() => _SubscriptionPayScreenState();

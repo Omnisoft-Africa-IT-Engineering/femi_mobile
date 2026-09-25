@@ -9,14 +9,14 @@ class CompanyInfoScreen extends StatefulWidget {
   final String nomComplet;
   final String nomEntrepriseInitial;
   final String email;
-  final String password;
+  final String? password;
 
   const CompanyInfoScreen({
     super.key,
     required this.nomComplet,
     required this.nomEntrepriseInitial,
     required this.email,
-    required this.password,
+    this.password,
   });
 
   @override
