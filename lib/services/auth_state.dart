@@ -12,6 +12,12 @@ class AuthState {
   AuthState._internal();
   static final AuthState instance = AuthState._internal();
 
+  // Émulateur Android : 10.0.2.2 = ton PC. Téléphone réel : IP locale du PC.
+  static const String baseUrl = 'http://10.0.2.2:8000';
+
+  // TEMPORAIRE : token de test, à remplacer par le vrai login.
+  String? token = '49ebb18157124edf6030fef14a957fbe94b05946';
+
   /// true = utilisateur connecté → afficher le Dashboard
   /// false = utilisateur non connecté → afficher le LoginScreen
   final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
