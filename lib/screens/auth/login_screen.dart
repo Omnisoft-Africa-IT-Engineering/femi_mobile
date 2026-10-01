@@ -160,7 +160,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       AuthState.instance.login();
-                      // Aucune logique d'authentification pour l'instant
+                      // Ferme les écrans empilés (connexion, onboarding) pour
+                      // révéler AuthGate, qui affiche alors MainNavigationScreen
+                      // maintenant que isLoggedIn est passé à true.
+                      // TODO backend : remplacer login() par un vrai appel API
+                      // (vérification email/mot de passe) avant d'appeler popUntil.
+                      Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryBlue,

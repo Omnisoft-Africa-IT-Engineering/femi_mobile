@@ -8,6 +8,7 @@ import '../subscription_pay/subscription_pay_screen.dart';
 import '../balance_generale/balance_generale_screen.dart';
 import '../balance_auxiliaire/balance_auxiliaire_screen.dart';
 import '../etat_financier/etat_financier_complet_screen.dart';
+import '../devis/devis_list_screen.dart';
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -132,6 +133,12 @@ class _CompteScreenState extends State<CompteScreen> {
             isProFeature: true,
             isUserPro: isPro,
             onTap: () => _ouvrirPageControle(const BalanceAuxiliaireScreen(), true),
+          ),
+          DocTile(
+            icon: Icons.receipt_long_outlined,
+            title: 'Devis',
+            isUserPro: isPro,
+            onTap: () => _ouvrirPageControle(const DevisListScreen(), false),
           ),
 
           const SizedBox(height: 20),
