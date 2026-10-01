@@ -2,14 +2,8 @@ import 'package:flutter/material.dart';
 import '../../services/auth_state.dart';
 import 'sign_up_screen.dart';
 
-/// Écran de connexion — DESIGN UNIQUEMENT (aucune logique d'authentification
-/// pour l'instant). À placer dans : lib/screens/auth/login_screen.dart
-///
-/// Pour l'intégrer plus tard dans main.dart, remplacer :
-///   home: const MainNavigationScreen(),
-/// par :
-///   home: const LoginScreen(),
-/// (ou gérer via un système de routes / état d'authentification)
+/// Écran de connexion, branché sur l'API via AuthState.login().
+/// À placer dans : lib/screens/auth/login_screen.dart
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -21,6 +15,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  String? _error;
 
   // Palette reprise du reste de l'app (main.dart / dashboard)
   static const Color _bgColor = Color(0xFFF7F9FC);
@@ -33,6 +29,35 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Renseignez votre email et votre mot de passe.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      await AuthState.instance.login(email, password);
+      // Après un await, on vérifie que l'écran existe encore.
+      if (!mounted) return;
+      // Ferme les écrans empilés (connexion, onboarding) pour révéler
+      // AuthGate, qui affiche MainNavigationScreen car isLoggedIn = true.
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -153,20 +178,21 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
+                // Message d'erreur
+                if (_error != null) ...[
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // Bouton principal "Se connecter"
                 SizedBox(
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      AuthState.instance.login();
-                      // Ferme les écrans empilés (connexion, onboarding) pour
-                      // révéler AuthGate, qui affiche alors MainNavigationScreen
-                      // maintenant que isLoggedIn est passé à true.
-                      // TODO backend : remplacer login() par un vrai appel API
-                      // (vérification email/mot de passe) avant d'appeler popUntil.
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    },
+                    onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryBlue,
                       foregroundColor: Colors.white,
@@ -175,7 +201,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
+                    child: _isLoading
+                        ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    )
+                        : const Text(
                       'Se connecter',
                       style: TextStyle(
                         fontSize: 16,
@@ -260,6 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
         controller: controller,
         keyboardType: keyboardType,
         obscureText: obscureText,
+        enabled: !_isLoading,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),

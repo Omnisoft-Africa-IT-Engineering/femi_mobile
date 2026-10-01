@@ -5,8 +5,12 @@ import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
 import 'screens/subscription_pay/subscription_pay_screen.dart';
 import 'screens/auth/auth_gate.dart';
+import 'services/auth_state.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Relit le token enregistré sur le téléphone pour rester connecté.
+  await AuthState.instance.restoreSession();
   runApp(const FemiApp());
 }
 

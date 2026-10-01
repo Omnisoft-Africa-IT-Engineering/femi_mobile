@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_state.dart';
 import '../subscription_pay/subscription_pay_screen.dart';
 
 /// Étape 3 de l'onboarding — DESIGN UNIQUEMENT (aucune logique
@@ -7,7 +6,7 @@ import '../subscription_pay/subscription_pay_screen.dart';
 /// l'utilisateur, puis ouvre SubscriptionPayScreen (formules
 /// d'abonnement déjà existantes). Que l'utilisateur paie ou ferme
 /// l'écran (bouton X = "passer"), l'onboarding se termine et
-/// l'utilisateur est connecté à l'app.
+/// l'utilisateur revient à l'écran de connexion.
 class CompanyInfoScreen extends StatefulWidget {
   const CompanyInfoScreen({super.key});
 
@@ -57,9 +56,9 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       context,
       MaterialPageRoute(builder: (context) => const SubscriptionPayScreen()),
     );
-    // Que le paiement ait réussi ou que l'utilisateur ait fermé (X = passer),
-    // l'onboarding se termine ici et l'utilisateur est connecté.
-    if (mounted) AuthState.instance.login();
+    // TEMPORAIRE : l'inscription n'est pas encore branchée à l'API.
+    // On revient à l'écran de connexion.
+    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
