@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart'; // Pour defaultTargetPlatform
 import 'package:flutter/material.dart';
-import '../../services/auth_state.dart';
-import 'sign_up_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Pour récupérer le token FCM
+import '../../services/femi_api_service.dart'; // Ajuste selon ton chemin si besoin
+import '../../states/auth_state.dart';
+import '../auth/sign_up_screen.dart';
 
-/// Écran de connexion, branché sur l'API via AuthState.login().
-/// À placer dans : lib/screens/auth/login_screen.dart
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -15,10 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _isLoading = false;
-  String? _error;
 
-  // Palette reprise du reste de l'app (main.dart / dashboard)
+  // Palette entreprise / application Femi
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
@@ -31,33 +30,93 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
+  /// Méthode d'enregistrement du token FCM auprès de Django
+  Future<void> _registerFcmDevice() async {
+    try {
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      if (fcmToken != null) {
+        String plateforme = defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+        await FemiApiService().enregistrerAppareil(fcmToken, plateforme);
+      }
+    } catch (e) {
+      debugPrint("Erreur lors de l'enregistrement de l'appareil FCM après login : $e");
+    }
+  }
 
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _error = 'Renseignez votre email et votre mot de passe.');
+  Future<void> _handleLogin() async {
+    final username = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs'),
+          backgroundColor: Colors.orange,
+        ),
+      );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    final success = await AuthState.instance.login(username, password);
 
-    try {
-      await AuthState.instance.login(email, password);
-      // Après un await, on vérifie que l'écran existe encore.
+    if (!mounted) return;
+
+    if (success) {
+      // Connexion réussie -> Enregistrement du device FCM côté backend
+      await _registerFcmDevice();
+
       if (!mounted) return;
-      // Ferme les écrans empilés (connexion, onboarding) pour révéler
-      // AuthGate, qui affiche MainNavigationScreen car isLoggedIn = true.
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    } on AuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AuthState.instance.errorMessage.value ?? 'Échec de connexion',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  Future<void> _handleGoogleLogin() async {
+    final success = await AuthState.instance.loginWithGoogle();
+
+    if (!mounted) return;
+
+    if (success) {
+      // Connexion Google réussie -> Enregistrement du device FCM côté backend
+      await _registerFcmDevice();
+
+      if (!mounted) return;
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    } else {
+      final msg = AuthState.instance.errorMessage.value;
+      // Si msg est null → l'utilisateur a juste annulé, on ne montre rien
+      if (msg != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleSocialLogin(String provider) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Connexion avec $provider en cours...'),
+        backgroundColor: _primaryBlue,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // TODO: Telegram / Apple plus tard
   }
 
   @override
@@ -71,13 +130,13 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 60),
+                const SizedBox(height: 40),
 
-                // Logo / Icône de l'app
+                // Logo
                 Center(
                   child: Container(
-                    width: 88,
-                    height: 88,
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
                       color: _accentTeal,
                       borderRadius: BorderRadius.circular(24),
@@ -85,11 +144,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: const Icon(
                       Icons.auto_awesome,
                       color: _darkGreen,
-                      size: 40,
+                      size: 38,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
                 const Center(
                   child: Text(
@@ -101,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Center(
                   child: Text(
                     'Connectez-vous pour accéder à votre compte',
@@ -112,11 +171,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 32),
 
-                // Champ Email
+                // Champ Identifiant / Email
                 const Text(
-                  'Email',
+                  'Nom d\'utilisateur ou Email',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -126,11 +185,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _emailController,
-                  hint: 'exemple@email.com',
-                  icon: Icons.mail_outline,
+                  hint: 'Nom d\'utilisateur ou exemple@email.com',
+                  icon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 // Champ Mot de passe
                 const Text(
@@ -164,9 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      // À implémenter : navigation vers "mot de passe oublié"
-                    },
+                    onPressed: () {},
                     child: Text(
                       'Mot de passe oublié ?',
                       style: TextStyle(
@@ -176,68 +233,106 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
-                // Message d'erreur
-                if (_error != null) ...[
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // Bouton principal "Se connecter"
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryBlue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                // Bouton principal - Se Connecter
+                ValueListenableBuilder<bool>(
+                  valueListenable: AuthState.instance.isLoading,
+                  builder: (context, isLoading, child) {
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _primaryBlue,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : const Text(
+                                'Se connecter',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                       ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                        : const Text(
-                      'Se connecter',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-                // Séparateur "ou"
+                // Séparateur "ou continuer avec"
                 Row(
                   children: [
                     Expanded(child: Divider(color: Colors.grey[300])),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'ou',
+                        'ou continuer avec',
                         style: TextStyle(color: Colors.grey[500], fontSize: 13),
                       ),
                     ),
                     Expanded(child: Divider(color: Colors.grey[300])),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // Bouton secondaire "Créer un compte"
+                // --- SECTION BOUTONS SOCIAUX ---
+                ValueListenableBuilder<bool>(
+                  valueListenable: AuthState.instance.isLoading,
+                  builder: (context, isLoading, _) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Google (fonctionnel)
+                        _buildSocialButton(
+                          label: 'Google',
+                          icon: Icons.g_mobiledata_rounded,
+                          iconColor: const Color(0xFFEA4335),
+                          onPressed: isLoading ? null : _handleGoogleLogin,
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Telegram (placeholder)
+                        _buildSocialButton(
+                          label: 'Telegram',
+                          icon: Icons.send_rounded,
+                          iconColor: const Color(0xFF0088CC),
+                          onPressed: isLoading
+                              ? null
+                              : () => _handleSocialLogin('Telegram'),
+                        ),
+                        const SizedBox(width: 14),
+
+                        // Apple (placeholder)
+                        _buildSocialButton(
+                          label: 'Apple',
+                          icon: Icons.apple_rounded,
+                          iconColor: Colors.black,
+                          onPressed: isLoading
+                              ? null
+                              : () => _handleSocialLogin('Apple'),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 28),
+
+                // Bouton secondaire - Créer un compte
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -295,7 +390,6 @@ class _LoginScreenState extends State<LoginScreen> {
         controller: controller,
         keyboardType: keyboardType,
         obscureText: obscureText,
-        enabled: !_isLoading,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
@@ -303,7 +397,51 @@ class _LoginScreenState extends State<LoginScreen> {
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding:
-          const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialButton({
+    required String label,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback? onPressed,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x08000000),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: iconColor, size: 24),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF334155),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -91,10 +91,11 @@ class PdfExportService {
   }
 
   static Future<void> exportGrandLivre({
+    required String devise,
     required String totalDebit,
     required String totalCredit,
     required String soldeNet,
-    required List<Map<String, dynamic>> comptes,
+    required List<dynamic> comptes,
   }) async {
     final doc = pw.Document();
     doc.addPage(
@@ -104,7 +105,7 @@ class PdfExportService {
               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 8),
           pw.Text(
-              'Total Débit : $totalDebit   |   Total Crédit : $totalCredit   |   Solde Net : $soldeNet'),
+              'Total Débit : $totalDebit $devise   |   Total Crédit : $totalCredit $devise   |   Solde Net : $soldeNet $devise'),
           pw.SizedBox(height: 20),
           ...comptes.expand((compte) => [
             pw.Text('${compte['code']} — ${compte['nom']} (Solde : ${compte['solde']})',
@@ -122,10 +123,10 @@ class PdfExportService {
   }
 
   static Future<void> exportRegistreJournalier({
-    required String dateText,
-    required String totalDebit,
-    required String totalCredit,
-    required List<Map<String, dynamic>> ecritures,
+    required String dateLabel,
+    required String totalRecettes,
+    required String totalDepenses,
+    required List<Map<String, String>> ecritures,
   }) async {
     final doc = pw.Document();
     doc.addPage(
@@ -134,27 +135,28 @@ class PdfExportService {
           pw.Text('Registre Journalier',
               style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 4),
-          pw.Text(dateText),
-          pw.SizedBox(height: 8),
-          pw.Text('Total Débit : $totalDebit   |   Total Crédit : $totalCredit'),
+          pw.Text(dateLabel),
+          pw.SizedBox(height: 16),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Total recettes : $totalRecettes'),
+              pw.Text('Total dépenses : $totalDepenses'),
+            ],
+          ),
           pw.SizedBox(height: 20),
-          ...ecritures.expand((ecriture) {
-            final lines = List<Map<String, dynamic>>.from(ecriture['lines'] ?? []);
-            final bottomLine = ecriture['bottomLine'] as Map<String, dynamic>?;
-            final allLines = [...lines, if (bottomLine != null) bottomLine];
-            return [
-              pw.Text('${ecriture['id']} — ${ecriture['title']} (${ecriture['time']})',
-                  style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 6),
-              _buildEcritureLinesTable(allLines),
-              pw.SizedBox(height: 16),
-            ];
-          }),
+          if (ecritures.isEmpty)
+            pw.Text('Aucune transaction pour cette période.')
+          else
+            _buildEcrituresTable(ecritures),
         ],
       ),
     );
     await Printing.layoutPdf(
-        name: 'Registre_Journalier.pdf', onLayout: (format) async => doc.save());
+      name:
+      'Registre_Journalier_${dateLabel.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '_')}.pdf',
+      onLayout: (format) async => doc.save(),
+    );
   }
 
   /// Génère le PDF du Compte de Résultat (Produits / Charges / Résultat net).
@@ -485,22 +487,38 @@ class PdfExportService {
     );
   }
 
-  static pw.Widget _buildEcritureLinesTable(List<Map<String, dynamic>> lines) {
+  static pw.Widget _buildEcrituresTable(List<Map<String, String>> ecritures) {
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300),
-      columnWidths: const {0: pw.FlexColumnWidth(4), 1: pw.FlexColumnWidth(2)},
+      columnWidths: const {
+        0: pw.FlexColumnWidth(1),
+        1: pw.FlexColumnWidth(3),
+        2: pw.FlexColumnWidth(2),
+        3: pw.FlexColumnWidth(2),
+      },
       children: [
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-          children: [_headerCell('Compte'), _headerCell('Montant')],
+          children: [
+            _headerCell('Heure'),
+            _headerCell('Titre'),
+            _headerCell('Catégorie'),
+            _headerCell('Montant'),
+          ],
         ),
-        ...lines.map((l) => pw.TableRow(children: [
+        ...ecritures.map((e) => pw.TableRow(children: [
           pw.Padding(
               padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('${l['codeName'] ?? ''}')),
+              child: pw.Text(e['heure'] ?? '')),
           pw.Padding(
               padding: const pw.EdgeInsets.all(6),
-              child: pw.Text('${l['amount'] ?? ''}', textAlign: pw.TextAlign.right)),
+              child: pw.Text(e['titre'] ?? '')),
+          pw.Padding(
+              padding: const pw.EdgeInsets.all(6),
+              child: pw.Text(e['categorie'] ?? '')),
+          pw.Padding(
+              padding: const pw.EdgeInsets.all(6),
+              child: pw.Text(e['montant'] ?? '', textAlign: pw.TextAlign.right)),
         ])),
       ],
     );

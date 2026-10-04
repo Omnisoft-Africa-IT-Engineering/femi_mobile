@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 
 class MetricCardWidget extends StatelessWidget {
-  final String label;
+  final String title;
   final String value;
-  final String subtitle;
-  final Color subColor;
-  final bool warning;
+  final IconData icon;
+  final Color color;
+  final String? subtitle;
 
   const MetricCardWidget({
     super.key,
-    required this.label,
+    required this.title,
     required this.value,
-    required this.subtitle,
-    required this.subColor,
-    this.warning = false,
+    this.icon = Icons.analytics_outlined,
+    this.color = Colors.blue,
+    this.subtitle,
   });
 
   @override
@@ -23,54 +23,58 @@ class MetricCardWidget extends StatelessWidget {
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: warning ? const Color(0xFFFFF5F5) : Colors.white,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: warning ? Colors.red.shade200 : Colors.grey.shade200,
-        ),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  label,
-                  style: const TextStyle(
+                  title,
+                  style: TextStyle(
                     fontSize: 10,
-                    color: Colors.grey,
                     fontWeight: FontWeight.bold,
+                    color: Colors.grey.shade600,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (warning)
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  size: 14,
-                  color: Colors.red,
-                ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 10,
-              color: subColor,
-              fontWeight: FontWeight.w500,
+          if (subtitle != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.grey.shade500,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
+          ],
         ],
       ),
     );

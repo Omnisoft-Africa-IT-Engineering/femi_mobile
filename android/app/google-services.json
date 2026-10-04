@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "924074246865",
+    "project_id": "femi-app",
+    "storage_bucket": "femi-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:924074246865:android:0c109d0e4cb8cd31bffbf0",
+        "android_client_info": {
+          "package_name": "com.example.femi_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBnzlrN4UHtmJpmsZD7ffWy1TVXGcYdALI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

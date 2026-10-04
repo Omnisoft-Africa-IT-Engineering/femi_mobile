@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../onboarding/company_info_screen.dart';
 
-/// Étape 2 de l'onboarding — DESIGN UNIQUEMENT (aucune logique
-/// d'inscription pour l'instant). Récolte les infos personnelles,
-/// puis enchaîne vers CompanyInfoScreen (infos de l'entreprise).
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -13,10 +10,10 @@ class SignUpScreen extends StatefulWidget {
 
 class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _nomCompletController = TextEditingController();
+  final TextEditingController _entrepriseController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-  TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -29,24 +26,80 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   void dispose() {
     _nomCompletController.dispose();
+    _entrepriseController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
+  void _handleNextStep() {
+    final nom = _nomCompletController.text.trim();
+    final entreprise = _entrepriseController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (nom.isEmpty || entreprise.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (!email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Adresse e-mail invalide'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le mot de passe doit contenir au moins 6 caractères'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Les mots de passe ne correspondent pas'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // On transmet les données saisies à l'étape suivante — elles étaient
+    // auparavant perdues car jamais passées au constructeur de
+    // CompanyInfoScreen.
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CompanyInfoScreen(
+          nomComplet: nom,
+          nomEntrepriseInitial: entreprise,
+          email: email,
+          password: password,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _bgColor,
-      appBar: AppBar(
-        backgroundColor: _bgColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -54,41 +107,88 @@ class _SignUpScreenState extends State<SignUpScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 4),
+                const SizedBox(height: 16),
 
-                // Indicateur d'étape (1/3)
+                Center(
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: _accentTeal,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.auto_awesome,
+                      color: _darkGreen,
+                      size: 32,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
                 _buildStepIndicator(currentStep: 1),
                 const SizedBox(height: 24),
 
-                const Text(
-                  'Créer votre compte',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A1A1A),
+                const Center(
+                  child: Text(
+                    'Créer votre compte',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A1A1A),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  'Commençons par vos informations personnelles',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                Center(
+                  child: Text(
+                    'Commençons par vos informations personnelles',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 32),
 
-                const Text('Nom complet',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Nom complet',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _nomCompletController,
-                  hint: 'Ex: Odette Sogboe',
+                  hint: 'Ex: Jean-Baptiste',
                   icon: Icons.person_outline,
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Email',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  "Nom de l'entreprise",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _buildInputField(
+                  controller: _entrepriseController,
+                  hint: 'Ex: Komi Services',
+                  icon: Icons.storefront_outlined,
+                ),
+                const SizedBox(height: 20),
+
+                const Text(
+                  'Email',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _emailController,
@@ -98,9 +198,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Mot de passe',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Mot de passe',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _passwordController,
@@ -109,18 +214,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   obscureText: _obscurePassword,
                   suffixIcon: IconButton(
                     icon: Icon(
-                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      _obscurePassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
                       color: Colors.grey,
                       size: 20,
                     ),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Confirmer le mot de passe',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Confirmer le mot de passe',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _confirmPasswordController,
@@ -135,8 +248,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       color: Colors.grey,
                       size: 20,
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    onPressed: () => setState(() =>
+                        _obscureConfirmPassword = !_obscureConfirmPassword),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -145,29 +258,55 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const CompanyInfoScreen()),
-                      );
-                    },
+                    onPressed: _handleNextStep,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       elevation: 0,
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Suivant', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        Text(
+                          'Suivant',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         SizedBox(width: 6),
                         Icon(Icons.arrow_forward, size: 18),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: RichText(
+                      text: TextSpan(
+                        text: 'Déjà un compte ? ',
+                        style:
+                            TextStyle(color: Colors.grey[700], fontSize: 13),
+                        children: const [
+                          TextSpan(
+                            text: 'Se connecter',
+                            style: TextStyle(
+                              color: _darkGreen,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -207,7 +346,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5)],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5),
+        ],
       ),
       child: TextField(
         controller: controller,
@@ -219,7 +360,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           prefixIcon: Icon(icon, color: Colors.grey[500], size: 20),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         ),
       ),
     );

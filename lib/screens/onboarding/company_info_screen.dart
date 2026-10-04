@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart';
-import '../subscription_pay/subscription_pay_screen.dart';
+import '../subscription_pay/subscription_pay_screen.dart'; 
 
-/// Étape 3 de l'onboarding — DESIGN UNIQUEMENT (aucune logique
-/// pour l'instant). Récolte les informations sur l'entreprise de
-/// l'utilisateur, puis ouvre SubscriptionPayScreen (formules
-/// d'abonnement déjà existantes). Que l'utilisateur paie ou ferme
-/// l'écran (bouton X = "passer"), l'onboarding se termine et
-/// l'utilisateur revient à l'écran de connexion.
+/// Étape 2 de l'onboarding — Informations sur l'entreprise.
+/// Ne crée plus le compte directement : redirige vers SubscriptionPayScreen,
+/// qui finalise la création du compte (Entreprise + Utilisateur) une fois
+/// le paiement de l'abonnement confirmé.
 class CompanyInfoScreen extends StatefulWidget {
-  const CompanyInfoScreen({super.key});
+  final String nomComplet;
+  final String nomEntrepriseInitial;
+  final String email;
+  final String password;
+
+  const CompanyInfoScreen({
+    super.key,
+    required this.nomComplet,
+    required this.nomEntrepriseInitial,
+    required this.email,
+    required this.password,
+  });
 
   @override
   State<CompanyInfoScreen> createState() => _CompanyInfoScreenState();
 }
 
 class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
-  final TextEditingController _nomEntrepriseController = TextEditingController();
+  late final TextEditingController _nomEntrepriseController;
   final TextEditingController _adresseController = TextEditingController();
   final TextEditingController _villeController = TextEditingController();
   final TextEditingController _telephoneController = TextEditingController();
@@ -43,6 +52,13 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // Pré-rempli avec le nom saisi à l'étape 1, mais reste modifiable.
+    _nomEntrepriseController = TextEditingController(text: widget.nomEntrepriseInitial);
+  }
+
+  @override
   void dispose() {
     _nomEntrepriseController.dispose();
     _adresseController.dispose();
@@ -51,14 +67,65 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
     super.dispose();
   }
 
-  Future<void> _terminerOnboarding() async {
-    await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (context) => const SubscriptionPayScreen()),
+  /// Convertit le libellé affiché dans le dropdown vers le code attendu
+  /// par Django (Entreprise.TYPE_ENTREPRISE_CHOICES : INDIVIDUEL/SARL/SA/AUTRE).
+  String _convertirFormeJuridiqueVersCode(String formeJuridique) {
+    switch (formeJuridique) {
+      case 'Entreprise individuelle':
+        return 'INDIVIDUEL';
+      case 'SARL':
+        return 'SARL';
+      case 'SA':
+        return 'SA';
+      default:
+        return 'AUTRE';
+    }
+  }
+
+  /// Valide le formulaire puis ouvre l'écran d'abonnement/paiement.
+  /// La création du compte (AuthState.instance.register) ne se fait plus
+  /// ici : c'est SubscriptionPayScreen qui s'en charge une fois le
+  /// paiement confirmé (voir isOnboarding / _gererPaiement là-bas).
+  void _continuerVersPaiement() {
+    final nomEntreprise = _nomEntrepriseController.text.trim();
+    if (nomEntreprise.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le nom de l\'entreprise est requis'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // Requis pour FedaPay (Mobile Money) au moment du paiement — mieux
+    // vaut bloquer ici que de laisser échouer l'appel de paiement plus
+    // loin dans le flux, avec un message d'erreur moins clair.
+    final telephone = _telephoneController.text.trim();
+    if (telephone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le numéro de téléphone est requis pour le paiement'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SubscriptionPayScreen(
+          nomComplet: widget.nomComplet,
+          email: widget.email,
+          password: widget.password,
+          nomEntreprise: nomEntreprise,
+          secteurNom: _secteurActivite,
+          telephoneWhatsapp: telephone,
+          devise: _devise,
+          typeEntreprise: _convertirFormeJuridiqueVersCode(_formeJuridique),
+        ),
+      ),
     );
-    // TEMPORAIRE : l'inscription n'est pas encore branchée à l'API.
-    // On revient à l'écran de connexion.
-    if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
@@ -86,7 +153,11 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
 
                 const Text(
                   'Votre entreprise',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A)),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -95,8 +166,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 32),
 
-                const Text("Nom de l'entreprise",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  "Nom de l'entreprise",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _nomEntrepriseController,
@@ -105,8 +182,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text("Secteur d'activité",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  "Secteur d'activité",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildDropdownField(
                   value: _secteurActivite,
@@ -117,8 +200,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text("Type d'activité",
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  "Type d'activité",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -156,8 +245,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ],
                 const SizedBox(height: 20),
 
-                const Text('Forme juridique',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Forme juridique',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildDropdownField(
                   value: _formeJuridique,
@@ -168,8 +263,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Adresse',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Adresse',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _adresseController,
@@ -186,9 +287,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Ville',
-                              style: TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                          const Text(
+                            'Ville',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF444444),
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           _buildInputField(
                             controller: _villeController,
@@ -203,9 +309,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Devise',
-                              style: TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                          const Text(
+                            'Devise',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF444444),
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           _buildDropdownField(
                             value: _devise,
@@ -221,8 +332,14 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text('Numéro de téléphone',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF444444))),
+                const Text(
+                  'Numéro de téléphone *',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF444444),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildInputField(
                   controller: _telephoneController,
@@ -236,17 +353,25 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                   width: double.infinity,
                   height: 52,
                   child: ElevatedButton(
-                    onPressed: _terminerOnboarding,
+                    onPressed: _continuerVersPaiement,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _primaryBlue,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       elevation: 0,
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Continuer', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        Text(
+                          'Continuer',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                         SizedBox(width: 6),
                         Icon(Icons.arrow_forward, size: 18),
                       ],
@@ -291,7 +416,9 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5)],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5),
+        ],
       ),
       child: TextField(
         controller: controller,
@@ -318,7 +445,9 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5)],
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5),
+        ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: DropdownButtonFormField<String>(
@@ -333,7 +462,10 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
           contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         ),
         items: items
-            .map((item) => DropdownMenuItem(value: item, child: Text(item, style: const TextStyle(fontSize: 14))))
+            .map((item) => DropdownMenuItem(
+                  value: item,
+                  child: Text(item, style: const TextStyle(fontSize: 14)),
+                ))
             .toList(),
         onChanged: onChanged,
       ),
