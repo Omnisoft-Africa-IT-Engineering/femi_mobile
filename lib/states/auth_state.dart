@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/femi_api_service.dart';
+import '../database/user_local_dao.dart';
 
 /// État d'authentification global de l'application connectée au backend Django.
 class AuthState {
@@ -57,14 +59,34 @@ class AuthState {
     return null;
   }
 
-  Future<void> checkAuthStatus() async {
+    Future<void> checkAuthStatus() async {
     final token = await _apiService.getToken();
-    if (token != null && token.isNotEmpty) {
-      isLoggedIn.value = true;
-      await refreshIsProFromBackend();
-    } else {
+
+    if (token == null || token.isEmpty) {
       isLoggedIn.value = false;
+      return;
     }
+
+    isLoggedIn.value = true;
+
+    // 1. Lecture immédiate du cache local (⚡ pas d'attente réseau).
+    //    Permet d'afficher le dashboard tout de suite avec les
+    //    dernières données connues, même si Render est lent.
+    try {
+      final cachedUser = await UserLocalDao.instance.getUser();
+      if (cachedUser != null) {
+        isPro.value = cachedUser.isPro;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Lecture du cache local impossible : $e');
+    }
+
+    // 2. Rafraîchissement en arrière-plan depuis le backend.
+    //    Volontairement NON attendu (pas de `await`) : checkAuthStatus()
+    //    retourne donc dès que le cache local est lu, sans bloquer la
+    //    navigation vers le dashboard. isPro sera mis à jour dès que la
+    //    réponse de Render arrive.
+    unawaited(refreshIsProFromBackend());
   }
 
   Future<bool> login(String username, String password) async {
