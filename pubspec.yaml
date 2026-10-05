@@ -33,6 +33,7 @@ dependencies:
 
   # Ajouté pour afficher la page de paiement FedaPay dans l'app
   webview_flutter: ^4.10.0
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:
