@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'package:flutter/foundation.dart'; // Add this import at the top
-import 'services/femi_api_service.dart';   // Adjust to your actual path
+import 'package:flutter/foundation.dart'; 
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
@@ -17,56 +16,23 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  // Initialisation et écoute FCM
-  await _setupFcmToken();
-
-  runApp(const FemiApp());
-}
-
-Future<void> _setupFcmToken() async {
+  // Configuration des options d'affichage des notifications au premier plan
   FirebaseMessaging messaging = FirebaseMessaging.instance;
-
   await messaging.setForegroundNotificationPresentationOptions(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
-  alert: true,
-  badge: true,
-  sound: true,
-);
+  // Écoute des messages quand l'application est ouverte
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    debugPrint("Message FCM reçu au premier plan : ${message.notification?.title}");
+    NotificationEvents.nouvelleNotification.value++;
+  });
 
-  if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-    String? token = await messaging.getToken();
-    debugPrint("==================================================");
-    debugPrint("MON TOKEN FCM : $token");
-    debugPrint("==================================================");
-
-    if (token != null) {
-      // 1. On détecte la plateforme (IOS ou ANDROID)
-      String plateforme = defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
-
-      // 2. On envoie le token au backend via la méthode 22 de ton service
-      bool succes = await FemiApiService().enregistrerAppareil(token, plateforme);
-      if (succes) {
-        debugPrint("✅ Appareil enregistré avec succès dans le backend.");
-      } else {
-        debugPrint("⚠️ Échec de l'enregistrement (l'utilisateur n'est peut-être pas encore connecté).");
-      }
-    }
-
-    // 3. Écoute des messages quand l'application est ouverte
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint("Message FCM reçu au premier plan : ${message.notification?.title}");
-      NotificationEvents.nouvelleNotification.value++;
-    });
-
-  } else {
-    debugPrint("Permission notification refusée par l'utilisateur.");
-  }
+  runApp(const FemiApp());
 }
+
 class FemiApp extends StatelessWidget {
   const FemiApp({super.key});
 
@@ -126,8 +92,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   List<Widget> get _screens => [
         DashboardScreen(
-          onNavigateToFemi: _switchToFemiWithPrompt,
-          onNavigateToTab: _switchToTab),
+            onNavigateToFemi: _switchToFemiWithPrompt,
+            onNavigateToTab: _switchToTab),
 
         FemiChatScreen(
           initialPrompt: _pendingFemiPrompt,

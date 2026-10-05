@@ -4,6 +4,7 @@ class ChatInputBarWidget extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
   final Function(bool isCamera)? onPickImage;
+  final VoidCallback? onPickPdf;
   final VoidCallback? onMicToggle;
   final bool isRecording;
 
@@ -12,47 +13,73 @@ class ChatInputBarWidget extends StatelessWidget {
     required this.controller,
     required this.onSend,
     this.onPickImage,
+    this.onPickPdf,
     this.onMicToggle,
     this.isRecording = false,
   });
 
-  // Affiche un menu bas pour choisir entre Prendre une photo ou Sélectionner dans la Galerie
+  // Menu des pièces jointes
   void _showAttachmentOptions(BuildContext context) {
-    if (onPickImage == null) return;
+    if (onPickImage == null && onPickPdf == null) return;
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(20),
+        ),
       ),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            padding: const EdgeInsets.symmetric(
+              vertical: 16,
+              horizontal: 12,
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceEvenly,
+              spacing: 20,
+              runSpacing: 20,
               children: [
-                _buildOptionTile(
-                  context,
-                  icon: Icons.camera_alt_rounded,
-                  label: 'Appareil photo',
-                  color: const Color(0xFF006654),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onPickImage!(true); // true pour Caméra
-                  },
-                ),
-                _buildOptionTile(
-                  context,
-                  icon: Icons.photo_library_rounded,
-                  label: 'Galerie',
-                  color: const Color(0xFF005AC1),
-                  onTap: () {
-                    Navigator.pop(context);
-                    onPickImage!(false); // false pour Galerie
-                  },
-                ),
+                // APPAREIL PHOTO
+                if (onPickImage != null)
+                  _buildOptionTile(
+                    context,
+                    icon: Icons.camera_alt_rounded,
+                    label: 'Appareil photo',
+                    color: const Color(0xFF006654),
+                    onTap: () {
+                      Navigator.pop(context);
+                      onPickImage!(true);
+                    },
+                  ),
+
+                // GALERIE
+                if (onPickImage != null)
+                  _buildOptionTile(
+                    context,
+                    icon: Icons.photo_library_rounded,
+                    label: 'Galerie',
+                    color: const Color(0xFF005AC1),
+                    onTap: () {
+                      Navigator.pop(context);
+                      onPickImage!(false);
+                    },
+                  ),
+
+                // PDF
+                if (onPickPdf != null)
+                  _buildOptionTile(
+                    context,
+                    icon: Icons.picture_as_pdf_rounded,
+                    label: 'Document PDF',
+                    color: Colors.red,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onPickPdf!();
+                    },
+                  ),
               ],
             ),
           ),
@@ -76,7 +103,11 @@ class ChatInputBarWidget extends StatelessWidget {
           CircleAvatar(
             radius: 28,
             backgroundColor: color.withOpacity(0.12),
-            child: Icon(icon, color: color, size: 28),
+            child: Icon(
+              icon,
+              color: color,
+              size: 28,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
@@ -95,12 +126,17 @@ class ChatInputBarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: isRecording ? Colors.red : Colors.grey.shade300,
+          color: isRecording
+              ? Colors.red
+              : Colors.grey.shade300,
           width: isRecording ? 1.5 : 1.0,
         ),
         boxShadow: [
@@ -113,13 +149,16 @@ class ChatInputBarWidget extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Bouton pièce jointe (Photos / Reçus)
+          // PIÈCES JOINTES
           IconButton(
-            icon: const Icon(Icons.attach_file, color: Colors.black54),
+            icon: const Icon(
+              Icons.attach_file,
+              color: Colors.black54,
+            ),
             onPressed: () => _showAttachmentOptions(context),
           ),
 
-          // Zone de saisie texte
+          // TEXTE
           Expanded(
             child: TextField(
               controller: controller,
@@ -130,23 +169,29 @@ class ChatInputBarWidget extends StatelessWidget {
                     ? 'Enregistrement vocal en cours...'
                     : 'Demandez à Femi...',
                 hintStyle: TextStyle(
-                  color: isRecording ? Colors.red : Colors.grey.shade500,
+                  color: isRecording
+                      ? Colors.red
+                      : Colors.grey.shade500,
                 ),
                 border: InputBorder.none,
               ),
             ),
           ),
 
-          // Bouton Micro / Vocal (Devient rouge si on enregistre)
+          // MICRO
           IconButton(
             icon: Icon(
-              isRecording ? Icons.stop_circle : Icons.mic_none_outlined,
-              color: isRecording ? Colors.red : Colors.black54,
+              isRecording
+                  ? Icons.stop_circle
+                  : Icons.mic_none_outlined,
+              color: isRecording
+                  ? Colors.red
+                  : Colors.black54,
             ),
             onPressed: onMicToggle,
           ),
 
-          // Bouton d'envoi principal
+          // ENVOYER
           Container(
             decoration: const BoxDecoration(
               color: Color(0xFF006654),

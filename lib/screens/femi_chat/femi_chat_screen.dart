@@ -1,9 +1,12 @@
 import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
+
 import '../../services/femi_agent_service.dart';
 import 'widgets/continuer_sur_whatsapp_banner.dart';
 import 'widgets/chat_date_badge_widget.dart';
@@ -13,21 +16,13 @@ import 'widgets/chat_history_drawer_widget.dart';
 
 class FemiChatScreen extends StatefulWidget {
   /// Message à envoyer automatiquement à l'agent dès l'ouverture/mise à
-  /// jour de l'écran (ex. déclenché par "Agir maintenant" sur le
-  /// Dashboard). Null ou vide = comportement normal, rien n'est envoyé.
+  /// jour de l'écran.
   final String? initialPrompt;
 
-  /// Change à chaque nouvelle demande d'envoi automatique, même si le
-  /// texte du prompt est identique à la fois précédente. Comme cet
-  /// écran reste vivant dans un IndexedStack, c'est ce compteur (via
-  /// didUpdateWidget) qui permet de détecter une nouvelle demande.
+  /// Change à chaque nouvelle demande d'envoi automatique.
   final int promptNonce;
 
-  /// Appelé quand l'utilisateur appuie sur la flèche de retour de
-  /// l'AppBar. FemiChatScreen est un onglet de MainNavigationScreen
-  /// (IndexedStack), pas un écran empilé via Navigator.push : il n'y a
-  /// donc rien à "pop". Si non fourni (écran utilisé ailleurs, poussé
-  /// directement via Navigator), on retombe sur Navigator.pop classique.
+  /// Appelé quand l'utilisateur appuie sur la flèche de retour.
   final VoidCallback? onBack;
 
   const FemiChatScreen({
@@ -43,6 +38,7 @@ class FemiChatScreen extends StatefulWidget {
 
 class _FemiChatScreenState extends State<FemiChatScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FemiAgentService _agentService = FemiAgentService();
@@ -52,16 +48,16 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
   bool _isLoading = false;
   bool _isRecording = false;
-  File? _selectedImage;
 
-  // Dernier promptNonce déjà traité, pour ne pas renvoyer deux fois le
-  // même message (ex. lors d'un rebuild qui ne vient pas d'une nouvelle
-  // demande de bascule).
+  File? _selectedImage;
+  File? _selectedPdf;
+
   int? _handledPromptNonce;
 
   final List<Map<String, dynamic>> _messages = [
     {
-      'text': 'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+      'text':
+          'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
       'isUser': false,
       'time': '10:24',
     },
@@ -82,13 +78,17 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
   void _maybeSendInitialPrompt() {
     final prompt = widget.initialPrompt;
-    if (prompt == null || prompt.trim().isEmpty) return;
-    if (_handledPromptNonce == widget.promptNonce) return;
+
+    if (prompt == null || prompt.trim().isEmpty) {
+      return;
+    }
+
+    if (_handledPromptNonce == widget.promptNonce) {
+      return;
+    }
 
     _handledPromptNonce = widget.promptNonce;
 
-    // On attend la fin du build en cours avant d'envoyer, pour être sûr
-    // que le widget est bien monté (setState dans _sendMessage).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _messageController.text = prompt;
@@ -96,14 +96,15 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     });
   }
 
-  /// Vérifie si un token JWT/DRF valide est stocké au chargement de l'écran
   Future<void> _checkAuthenticationStatus() async {
     final token = await _storage.read(key: 'auth_token') ??
         await _storage.read(key: 'access_token') ??
         await _storage.read(key: 'token');
 
     if (token == null || token.isEmpty) {
-      debugPrint('⚠️ Aucune clé d\'authentification trouvée au chargement du chat.');
+      debugPrint(
+        '⚠️ Aucune clé d\'authentification trouvée au chargement du chat.',
+      );
     }
   }
 
@@ -115,7 +116,10 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     super.dispose();
   }
 
-  // --- Gestion des images (Caméra / Galerie) ---
+  // ============================================================
+  // IMAGE : CAMÉRA / GALERIE
+  // ============================================================
+
   Future<void> _handlePickImage(bool isCamera) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
@@ -140,17 +144,102 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     }
   }
 
-  // --- Gestion du Micro / Enregistrement Vocal ---
+  // ============================================================
+  // PDF — API file_picker 11.x (sans .platform)
+  // ============================================================
+
+  Future<void> _handlePickPdf() async {
+    try {
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf'],
+      );
+
+      final path = result?.files.single.path;
+      if (path != null) {
+        setState(() {
+          _selectedPdf = File(path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Impossible de sélectionner le PDF : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  // ============================================================
+  // MICRO / ENREGISTREMENT VOCAL
+  // ============================================================
+
   Future<void> _handleMicToggle() async {
     if (_isRecording) {
+      // --- Arrêt de l'enregistrement → transcription ---
       final path = await _audioRecorder.stop();
+
       setState(() {
         _isRecording = false;
       });
-      if (path != null) {
-        _sendMessage(audioFile: File(path));
+
+      if (path == null) return;
+
+      setState(() {
+        _isLoading = true; // indique "transcription en cours"
+      });
+
+      try {
+        final transcription = await _agentService.transcribeAudio(File(path));
+
+        if (!mounted) return;
+
+        if (transcription.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Aucune parole détectée. Réessayez.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
+
+        // Texte dans la barre : l'utilisateur peut modifier puis envoyer
+        setState(() {
+          _messageController.text = transcription;
+          _messageController.selection = TextSelection.fromPosition(
+            TextPosition(offset: transcription.length),
+          );
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Transcription prête. Vérifiez puis envoyez.'),
+            backgroundColor: Color(0xFF006654),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur de transcription : $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     } else {
+      // --- Démarrage de l'enregistrement ---
       if (await _audioRecorder.hasPermission()) {
         final Directory appDocDir = await getApplicationDocumentsDirectory();
         final String filePath =
@@ -160,25 +249,34 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           const RecordConfig(encoder: AudioEncoder.aacLc),
           path: filePath,
         );
+
         setState(() {
           _isRecording = true;
         });
       }
     }
   }
+  // ============================================================
+  // ENVOI DU MESSAGE
+  // ============================================================
 
-  // --- Envoi du Message ---
   Future<void> _sendMessage({File? audioFile}) async {
     final text = _messageController.text.trim();
     final imageFileToSend = _selectedImage;
+    final pdfFileToSend = _selectedPdf;
 
-    if (text.isEmpty && imageFileToSend == null && audioFile == null) return;
+    if (text.isEmpty &&
+        imageFileToSend == null &&
+        pdfFileToSend == null &&
+        audioFile == null) {
+      return;
+    }
 
     final now = TimeOfDay.now();
     final timeString =
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}';
 
-    // 1. Vérification préalable de la présence du token
     final storedToken = await _storage.read(key: 'auth_token') ??
         await _storage.read(key: 'access_token') ??
         await _storage.read(key: 'token');
@@ -187,7 +285,9 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Session expirée ou non identifiée. Veuillez vous reconnecter.'),
+            content: Text(
+              'Session expirée ou non identifiée. Veuillez vous reconnecter.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -195,35 +295,37 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       return;
     }
 
-    // 2. Ajouter immédiatement le message utilisateur dans le chat
     setState(() {
       _messages.add({
         'text': text.isNotEmpty ? text : null,
         'imageFile': imageFileToSend,
         'audioFile': audioFile,
+        'pdfFile': pdfFileToSend,
         'isUser': true,
         'time': timeString,
       });
+
       _isLoading = true;
-      _selectedImage = null; // Réinitialiser l'aperçu après envoi
+      _selectedImage = null;
+      _selectedPdf = null;
     });
 
     _messageController.clear();
     _scrollToBottom();
 
     try {
-      // 3. Appel de l'API via le Service HTTP FemiAgentService
       final response = await _agentService.sendMessage(
         text: text.isNotEmpty ? text : null,
         imageFile: imageFileToSend,
         audioFile: audioFile,
+        pdfFile: pdfFileToSend, // important : envoi du PDF au backend
       );
 
       final respTime = TimeOfDay.now();
       final respTimeString =
-          '${respTime.hour.toString().padLeft(2, '0')}:${respTime.minute.toString().padLeft(2, '0')}';
+          '${respTime.hour.toString().padLeft(2, '0')}:'
+          '${respTime.minute.toString().padLeft(2, '0')}';
 
-      // 4. Traiter la réponse (Chat standard ou carte de Transaction)
       setState(() {
         final bool isTransaction = response['isTransaction'] == true ||
             response['transaction'] != null ||
@@ -250,12 +352,15 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       final errorMessage = e.toString();
 
       if (mounted) {
-        // Détection explicite de l'erreur d'authentification 401
-        if (errorMessage.contains('Authentication credentials were not provided') ||
+        if (errorMessage.contains(
+              'Authentication credentials were not provided',
+            ) ||
             errorMessage.contains('401')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Authentification échouée. Veuillez vous reconnecter à votre compte.'),
+              content: Text(
+                'Authentification échouée. Veuillez vous reconnecter à votre compte.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -290,7 +395,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     });
   }
 
-  // --- Widget pour afficher l'aperçu de l'image sélectionnée avant envoi ---
   Widget _buildSelectedImagePreview() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -331,6 +435,54 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     );
   }
 
+  Widget _buildSelectedPdfPreview() {
+    final fileName = _selectedPdf!.path.split(Platform.pathSeparator).last;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      padding: const EdgeInsets.all(10.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.picture_as_pdf_rounded,
+              color: Colors.red,
+              size: 30,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              fileName,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.red, size: 20),
+            onPressed: () {
+              setState(() {
+                _selectedPdf = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -338,17 +490,19 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       backgroundColor: const Color(0xFFF7F9FC),
       endDrawer: ChatHistoryDrawerWidget(
         onNouvelleConversation: () {
-          // TODO: quand l'endpoint sera prêt, réinitialiser réellement la
-          // conversation côté backend. Pour l'instant, simple message.
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Nouvelle conversation (bientôt disponible)')),
+            const SnackBar(
+              content: Text('Nouvelle conversation (bientôt disponible)'),
+            ),
           );
         },
         onSelectionnerConversation: (item) {
-          // TODO: charger la vraie conversation sélectionnée une fois
-          // l'endpoint d'historique disponible.
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Conversation "${item.title}" (bientôt disponible)')),
+            SnackBar(
+              content: Text(
+                'Conversation "${item.title}" (bientôt disponible)',
+              ),
+            ),
           );
         },
       ),
@@ -369,7 +523,9 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundImage: NetworkImage('https://i.pravatar.cc/100?img=5'),
+              backgroundImage: NetworkImage(
+                'https://i.pravatar.cc/100?img=5',
+              ),
             ),
             SizedBox(width: 10),
             Text(
@@ -401,8 +557,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           const SizedBox(height: 8),
           const ChatDateBadgeWidget(dateText: 'Aujourd\'hui, 10:24'),
           const SizedBox(height: 12),
-
-          // Zone d'affichage des messages
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
@@ -413,8 +567,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
               },
             ),
           ),
-
-          // Indicateur de chargement
           if (_isLoading)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -423,15 +575,9 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
                 color: Color(0xFF006654),
               ),
             ),
-
-          // Aperçu de l'image si sélectionnée
           if (_selectedImage != null) _buildSelectedImagePreview(),
-
-          // Bandeau "Continuer sur WhatsApp" — juste au-dessus de la
-          // barre de saisie, donc toujours visible même clavier ouvert.
+          if (_selectedPdf != null) _buildSelectedPdfPreview(),
           const ContinuerSurWhatsappBanner(),
-
-          // Barre de saisie
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: ChatInputBarWidget(
@@ -439,6 +585,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
               isRecording: _isRecording,
               onSend: () => _sendMessage(),
               onPickImage: _handlePickImage,
+              onPickPdf: _handlePickPdf,
               onMicToggle: _handleMicToggle,
             ),
           ),
