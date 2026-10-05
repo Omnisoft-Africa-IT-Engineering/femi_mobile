@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../database/user_local_dao.dart';
+import '../models/local_user.dart';
 
 /// Service centralisant tous les appels vers le backend Django de Femi.
 class FemiApiService {
@@ -237,6 +239,94 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     return 'Mon Entreprise';
   }
 
+  // --- Sauvegarder le profil utilisateur dans SQLite ---
+  Future<void> _saveProfileLocally(
+    Map<String, dynamic> profile,
+  ) async {
+    try {
+      final username = profile['username']?.toString();
+
+      final companyName =
+          profile['entreprise_nom']?.toString() ??
+          profile['company_name']?.toString();
+
+      final isPro = _extractIsProFromProfile(profile);
+
+      final plan =
+          profile['plan']?.toString() ??
+          profile['subscription_plan']?.toString() ??
+          profile['subscription_status']?.toString() ??
+          profile['abonnement']?.toString();
+
+      final user = LocalUser(
+        username: username,
+        companyName: companyName,
+        isPro: isPro,
+        plan: plan,
+        updatedAt: DateTime.now(),
+      );
+
+      await UserLocalDao.instance.saveUser(user);
+
+      debugPrint('💾 Profil utilisateur sauvegardé dans SQLite.');
+    } catch (e) {
+      debugPrint('⚠️ Impossible de sauvegarder le profil dans SQLite: $e');
+    }
+  }
+
+  // --- Déterminer le statut Pro à partir du profil ---
+  bool _extractIsProFromProfile(
+    Map<String, dynamic> profile,
+  ) {
+    final directValue =
+        profile['is_pro'] ??
+        profile['isPro'] ??
+        profile['is_premium'] ??
+        profile['pro'];
+
+    if (directValue is bool) {
+      return directValue;
+    }
+
+    if (directValue is num) {
+      return directValue != 0;
+    }
+
+    if (directValue != null) {
+      final value = directValue.toString().toLowerCase().trim();
+
+      if (value == 'true' ||
+          value == '1' ||
+          value == 'pro' ||
+          value == 'premium') {
+        return true;
+      }
+
+      if (value == 'false' || value == '0') {
+        return false;
+      }
+    }
+
+    final plan =
+        profile['plan'] ??
+        profile['subscription_status'] ??
+        profile['subscription_plan'] ??
+        profile['abonnement'];
+
+    if (plan != null) {
+      final value = plan.toString().toLowerCase().trim();
+
+      return value == 'pro' ||
+          value == 'business' ||
+          value == 'micro' ||
+          value == 'active' ||
+          value == 'actif' ||
+          value == 'premium';
+    }
+
+    return false;
+  }
+
   // --- 3. Récupérer le profil complet de l'utilisateur (GET /api/v1/auth/profile/) ---
   Future<Map<String, dynamic>?> getUserProfile() async {
     final token = await getToken();
@@ -249,15 +339,22 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
       );
 
       if (response.statusCode == 200) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
+        final profile =
+            jsonDecode(response.body) as Map<String, dynamic>;
+
+        // Sauvegarde locale pour les prochains démarrages.
+        await _saveProfileLocally(profile);
+
+        return profile;
       }
+
       return null;
     } catch (e) {
       debugPrint('Erreur lors de la récupération du profil: $e');
       return null;
     }
   }
-
+  
   // --- 4. Récupérer le token stocké localement ---
   Future<String?> getToken() async {
     return await _storage.read(key: 'auth_token');

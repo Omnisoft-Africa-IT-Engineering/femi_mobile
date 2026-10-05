@@ -1,9 +1,7 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// Test de fumée (smoke test) : vérifie que l'application démarre sans
+// planter. Les écrans réels de Femi (dashboard, auth, etc.) dépendent du
+// backend et de l'état de connexion, donc on se contente ici de vérifier
+// que le widget racine se construit correctement.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,20 +9,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:femi_mobile/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('FemiApp démarre sans erreur', (WidgetTester tester) async {
+    await tester.pumpWidget(const FemiApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    // Laisse le temps aux premiers appels asynchrones (ex: checkAuthStatus)
+    // de se lancer sans faire planter le test.
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Vérifie simplement qu'un MaterialApp (ou équivalent) a bien été monté.
+    expect(find.byType(MaterialApp), findsOneWidget);
   });
 }
