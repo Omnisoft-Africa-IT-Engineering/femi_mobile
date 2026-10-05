@@ -11,6 +11,7 @@ import '../bilan/bilan_screen.dart';
 import '../faq/faq_screen.dart'; // Import de la FAQ
 import '../../states/auth_state.dart';
 import '../echeances_fiscales/echeances_fiscales_screen.dart';
+import '../devis/devis_list_screen.dart';
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -106,6 +107,12 @@ class _CompteScreenState extends State<CompteScreen> {
                 title: 'Registre journalier',
                 isUserPro: isPro,
                 onTap: () => _ouvrirPageControle(const RegistreJournalierScreen(), false),
+              ),
+              DocTile(
+                icon: Icons.request_quote_outlined,
+                title: 'Devis',
+                isUserPro: isPro,
+                onTap: () => _ouvrirPageControle(const DevisListScreen(), false),
               ),
               DocTile(
                 icon: Icons.event_note_outlined,
