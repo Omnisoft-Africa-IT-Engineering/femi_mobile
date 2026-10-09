@@ -12,6 +12,8 @@ import '../faq/faq_screen.dart'; // Import de la FAQ
 import '../../states/auth_state.dart';
 import '../echeances_fiscales/echeances_fiscales_screen.dart';
 import '../devis/devis_list_screen.dart';
+import '../../models/team_models.dart';
+import '../settings/settings_screen.dart';
 
 // Import des widgets propres
 import 'widgets/plan_card.dart';
@@ -187,6 +189,38 @@ class _CompteScreenState extends State<CompteScreen> {
               ),
 
               const Divider(height: 32),
+
+              // Paramètres : visible seulement pour le gérant
+              ValueListenableBuilder<UserRole>(
+                valueListenable: AuthState.instance.role,
+                builder: (context, role, _) {
+                  if (role != UserRole.gerant) return const SizedBox.shrink();
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.settings_outlined,
+                            color: Color(0xFF2D3748)),
+                        title: const Text(
+                          'Paramètres',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF2D3748),
+                          ),
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                    ],
+                  );
+                },
+              ),
 
               // Section 4: Actions de compte
               // Bouton 1 : Se déconnecter

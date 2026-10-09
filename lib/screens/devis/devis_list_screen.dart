@@ -49,6 +49,8 @@ class _DevisListScreenState extends State<DevisListScreen> {
     final profil = await _service.getProfil();
     if (!mounted) return;
     await showProfilFacturationSheet(context, initial: profil);
+    if (!mounted) return;
+    _recharger();
   }
 
   Future<void> _ouvrirDetail(Devis devis) async {
@@ -151,7 +153,9 @@ class _DevisListScreenState extends State<DevisListScreen> {
                   const Text('Impossible de charger les devis.'),
                   const SizedBox(height: 12),
                   OutlinedButton(
-                      onPressed: _recharger, child: const Text('Réessayer')),
+                    onPressed: _recharger,
+                    child: const Text('Réessayer'),
+                  ),
                 ],
               ),
             );
@@ -214,7 +218,11 @@ class _DevisListScreenState extends State<DevisListScreen> {
 class _DevisTile extends StatelessWidget {
   final Devis devis;
   final VoidCallback onTap;
-  const _DevisTile({required this.devis, required this.onTap});
+
+  const _DevisTile({
+    required this.devis,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -222,8 +230,10 @@ class _DevisTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: ListTile(
         onTap: onTap,
-        title: Text(devis.clientNom,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(
+          devis.clientNom,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         subtitle: Text(
           '${devis.numeroDevis ?? 'Brouillon'} • ${formatDate(devis.dateEmission)}',
         ),
@@ -231,8 +241,10 @@ class _DevisTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(formatFcfa(devis.total),
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              formatFcfa(devis.total),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 4),
             StatutBadge(statut: devis.statut),
           ],
