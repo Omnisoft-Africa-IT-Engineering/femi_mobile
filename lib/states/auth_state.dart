@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/femi_api_service.dart';
 import '../database/user_local_dao.dart';
+import '../models/team_models.dart';
 
 /// État d'authentification global de l'application connectée au backend Django.
 class AuthState {
@@ -11,10 +12,13 @@ class AuthState {
 
   final FemiApiService _apiService = FemiApiService();
 
+
   final ValueNotifier<bool> isLoggedIn = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isPro = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(false);
   final ValueNotifier<String?> errorMessage = ValueNotifier<String?>(null);
+  final ValueNotifier<UserRole> role = ValueNotifier<UserRole>(UserRole.gerant);
+  bool get isGerant => role.value == UserRole.gerant;
 
   Future<void> refreshIsProFromBackend() async {
     final profile = await _apiService.getUserProfile();
@@ -26,7 +30,7 @@ class AuthState {
     } else {
       debugPrint(
         '⚠️ Impossible de déterminer le statut Pro depuis /auth/profile/ '
-        '— aucun champ reconnu dans la réponse : $profile.',
+            '— aucun champ reconnu dans la réponse : $profile.',
       );
     }
   }
@@ -59,7 +63,7 @@ class AuthState {
     return null;
   }
 
-    Future<void> checkAuthStatus() async {
+  Future<void> checkAuthStatus() async {
     final token = await _apiService.getToken();
 
     if (token == null || token.isEmpty) {
@@ -110,159 +114,159 @@ class AuthState {
 
   /// Connexion / inscription via Google
   /// Connexion / inscription via Google
-/// Connexion / inscription via Google.
-///
-/// Retourne :
-///
-/// {
-///   "success": true/false,
-///   "is_new_user": true/false,
-///   "google_data": {...}
-/// }
-///
-/// Pour un nouvel utilisateur, aucun compte Django n'est encore créé.
-/// Le formulaire d'inscription doit ensuite être affiché.
+  /// Connexion / inscription via Google.
+  ///
+  /// Retourne :
+  ///
+  /// {
+  ///   "success": true/false,
+  ///   "is_new_user": true/false,
+  ///   "google_data": {...}
+  /// }
+  ///
+  /// Pour un nouvel utilisateur, aucun compte Django n'est encore créé.
+  /// Le formulaire d'inscription doit ensuite être affiché.
 
-Future<Map<String, dynamic>> loginWithGoogle() async {
-  isLoading.value = true;
-  errorMessage.value = null;
+  Future<Map<String, dynamic>> loginWithGoogle() async {
+    isLoading.value = true;
+    errorMessage.value = null;
 
-  try {
-    const String webClientId =
-        '924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com';
+    try {
+      const String webClientId =
+          '924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com';
 
-    final GoogleSignIn googleSignIn = GoogleSignIn(
-      scopes: ['email', 'profile'],
-      clientId: kIsWeb ? webClientId : null,
-      serverClientId: kIsWeb ? null : webClientId,
-    );
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        clientId: kIsWeb ? webClientId : null,
+        serverClientId: kIsWeb ? null : webClientId,
+      );
 
-    // ==========================================================
-    // 1. Ouvrir Google
-    // ==========================================================
+      // ==========================================================
+      // 1. Ouvrir Google
+      // ==========================================================
 
-    final GoogleSignInAccount? account =
-        await googleSignIn.signIn();
+      final GoogleSignInAccount? account =
+      await googleSignIn.signIn();
 
-    if (account == null) {
-      isLoading.value = false;
+      if (account == null) {
+        isLoading.value = false;
 
-      return {
-        'success': false,
-        'is_new_user': false,
-      };
-    }
+        return {
+          'success': false,
+          'is_new_user': false,
+        };
+      }
 
-    // ==========================================================
-    // 2. Récupérer l'authentification Google
-    // ==========================================================
+      // ==========================================================
+      // 2. Récupérer l'authentification Google
+      // ==========================================================
 
-    final GoogleSignInAuthentication auth =
-        await account.authentication;
+      final GoogleSignInAuthentication auth =
+      await account.authentication;
 
-    final String? tokenToSend =
-        auth.idToken ?? auth.accessToken;
+      final String? tokenToSend =
+          auth.idToken ?? auth.accessToken;
 
-    if (tokenToSend == null) {
+      if (tokenToSend == null) {
+        isLoading.value = false;
+
+        errorMessage.value =
+        "Impossible d'obtenir le token Google.";
+
+        return {
+          'success': false,
+          'is_new_user': false,
+        };
+      }
+
+      // ==========================================================
+      // 3. Envoyer le token à Django
+      // ==========================================================
+
+      final data =
+      await _apiService.googleLogin(tokenToSend);
+
+      if (data == null) {
+        isLoading.value = false;
+
+        errorMessage.value =
+        "Échec de la connexion Google.";
+
+        return {
+          'success': false,
+          'is_new_user': false,
+        };
+      }
+
+      // ==========================================================
+      // 4. NOUVEL UTILISATEUR
+      // ==========================================================
+
+      if (data['is_new_user'] == true) {
+        isLoading.value = false;
+
+        debugPrint(
+          '🆕 Google : nouvel utilisateur.',
+        );
+
+        return {
+          'success': true,
+          'is_new_user': true,
+          'google_data': data['google_data'],
+        };
+      }
+
+      // ==========================================================
+      // 5. UTILISATEUR EXISTANT
+      // ==========================================================
+
+      if (data['is_new_user'] == false) {
+        isLoading.value = false;
+
+        if (isLoggedIn.value) {
+          isLoggedIn.value = false;
+        }
+
+        isLoggedIn.value = true;
+
+        await refreshIsProFromBackend();
+
+        return {
+          'success': true,
+          'is_new_user': false,
+        };
+      }
+
+      // ==========================================================
+      // 6. Réponse inattendue
+      // ==========================================================
+
       isLoading.value = false;
 
       errorMessage.value =
-          "Impossible d'obtenir le token Google.";
+      "Réponse inattendue du serveur.";
 
       return {
         'success': false,
         'is_new_user': false,
       };
-    }
 
-    // ==========================================================
-    // 3. Envoyer le token à Django
-    // ==========================================================
-
-    final data =
-        await _apiService.googleLogin(tokenToSend);
-
-    if (data == null) {
+    } catch (e) {
       isLoading.value = false;
 
       errorMessage.value =
-          "Échec de la connexion Google.";
-
-      return {
-        'success': false,
-        'is_new_user': false,
-      };
-    }
-
-    // ==========================================================
-    // 4. NOUVEL UTILISATEUR
-    // ==========================================================
-
-    if (data['is_new_user'] == true) {
-      isLoading.value = false;
+      "Erreur Google : $e";
 
       debugPrint(
-        '🆕 Google : nouvel utilisateur.',
+        'loginWithGoogle error: $e',
       );
 
       return {
-        'success': true,
-        'is_new_user': true,
-        'google_data': data['google_data'],
-      };
-    }
-
-    // ==========================================================
-    // 5. UTILISATEUR EXISTANT
-    // ==========================================================
-
-    if (data['is_new_user'] == false) {
-      isLoading.value = false;
-
-      if (isLoggedIn.value) {
-        isLoggedIn.value = false;
-      }
-
-      isLoggedIn.value = true;
-
-      await refreshIsProFromBackend();
-
-      return {
-        'success': true,
+        'success': false,
         'is_new_user': false,
       };
     }
-
-    // ==========================================================
-    // 6. Réponse inattendue
-    // ==========================================================
-
-    isLoading.value = false;
-
-    errorMessage.value =
-        "Réponse inattendue du serveur.";
-
-    return {
-      'success': false,
-      'is_new_user': false,
-    };
-
-  } catch (e) {
-    isLoading.value = false;
-
-    errorMessage.value =
-        "Erreur Google : $e";
-
-    debugPrint(
-      'loginWithGoogle error: $e',
-    );
-
-    return {
-      'success': false,
-      'is_new_user': false,
-    };
   }
-}
   Future<bool> register({
     required String username,
     required String password,
@@ -298,7 +302,7 @@ Future<Map<String, dynamic>> loginWithGoogle() async {
       return true;
     } else {
       errorMessage.value =
-          "Impossible de créer le compte (nom d'utilisateur déjà pris, ou erreur serveur).";
+      "Impossible de créer le compte (nom d'utilisateur déjà pris, ou erreur serveur).";
       return false;
     }
   }
@@ -310,6 +314,7 @@ Future<Map<String, dynamic>> loginWithGoogle() async {
     } catch (_) {}
     isLoggedIn.value = false;
     isPro.value = false;
+    role.value = UserRole.gerant;
   }
 
   Future<bool> deleteAccount() async {
@@ -323,6 +328,7 @@ Future<Map<String, dynamic>> loginWithGoogle() async {
       } catch (_) {}
       isLoggedIn.value = false;
       isPro.value = false;
+      role.value = UserRole.gerant;
       isLoading.value = false;
       return true;
     } catch (e) {

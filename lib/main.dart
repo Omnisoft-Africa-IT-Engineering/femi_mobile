@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-import 'package:flutter/foundation.dart'; 
+import 'package:flutter/foundation.dart';
+import 'models/team_models.dart';
+import 'states/auth_state.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
@@ -73,7 +75,9 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  // Onglets : 0 = Tableau de bord (KPI), 1 = Chat Femi, 2 = Compte.
+  // Le gérant démarre sur le tableau de bord, l'employé directement sur le chat.
+  int _currentIndex = AuthState.instance.isGerant ? 0 : 1;
 
   String? _pendingFemiPrompt;
   int _femiPromptNonce = 0;
@@ -87,54 +91,80 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _switchToTab(int index) {
+    // Un employé ne peut aller que sur le chat (index 1).
+    if (!AuthState.instance.isGerant && index != 1) return;
     setState(() => _currentIndex = index);
   }
 
-  List<Widget> get _screens => [
-        DashboardScreen(
-            onNavigateToFemi: _switchToFemiWithPrompt,
-            onNavigateToTab: _switchToTab),
+  // Pour un employé, le tableau de bord et le Compte ne sont même pas
+  // construits (on met un widget vide à leur place pour garder les index).
+  List<Widget> _buildScreens(bool estGerant) => [
+    estGerant
+        ? DashboardScreen(
+        onNavigateToFemi: _switchToFemiWithPrompt,
+        onNavigateToTab: _switchToTab)
+        : const SizedBox.shrink(),
 
-        FemiChatScreen(
-          initialPrompt: _pendingFemiPrompt,
-          promptNonce: _femiPromptNonce,
-          onBack: () => _switchToTab(0),
-        ),
-        const CompteScreen(),
-      ];
+    FemiChatScreen(
+      initialPrompt: _pendingFemiPrompt,
+      promptNonce: _femiPromptNonce,
+      onBack: () {
+        if (estGerant) _switchToTab(0);
+      },
+    ),
+    estGerant ? const CompteScreen() : const SizedBox.shrink(),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _currentIndex == 0,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _switchToTab(0);
+    // Se reconstruit automatiquement si le rôle change.
+    return ValueListenableBuilder<UserRole>(
+      valueListenable: AuthState.instance.role,
+      builder: (context, role, _) {
+        final bool estGerant = role == UserRole.gerant;
+        // Un employé reste toujours sur le chat.
+        final int index = estGerant ? _currentIndex : 1;
+
+        return PopScope(
+          canPop: !estGerant || index == 0,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            _switchToTab(0);
+          },
+          child: Scaffold(
+            body: IndexedStack(
+              index: index,
+              children: _buildScreens(estGerant),
+            ),
+            // Barre du bas réservée au gérant.
+            bottomNavigationBar: estGerant
+                ? Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius:
+                BorderRadius.vertical(top: Radius.circular(20)),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 10,
+                      spreadRadius: 1),
+                ],
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(0, Icons.grid_view_rounded, 'KPI'),
+                  _buildNavItem(1, Icons.auto_awesome, 'Femi'),
+                  _buildNavItem(
+                      2, Icons.account_balance_outlined, 'Compte'),
+                ],
+              ),
+            )
+                : null,
+          ),
+        );
       },
-      child: Scaffold(
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _screens,
-        ),
-        bottomNavigationBar: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 1),
-            ],
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(0, Icons.grid_view_rounded, 'KPI'),
-              _buildNavItem(1, Icons.auto_awesome, 'Femi'),
-              _buildNavItem(2, Icons.account_balance_outlined, 'Compte'),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
