@@ -68,18 +68,32 @@ class DevisService {
   }
 
   // --- Changement de statut : PATCH /api/v1/devis/{id}/ ---
-  // Envoie BROUILLON, ENVOYE, ACCEPTE, REFUSE ou CONVERTI.
+  // API : BROUILLON → VALIDE | ANNULE ; VALIDE → ANNULE
   Future<void> changerStatut(Object id, StatutDevis statut) async {
     final r = await http
         .patch(
-      Uri.parse('$_base/$id/'),
-      headers: await _headers(),
-      body: jsonEncode({'statut': statut.apiValue}),
-    )
+          Uri.parse('$_base/$id/'),
+          headers: await _headers(),
+          body: jsonEncode({'statut': statut.apiValue}),
+        )
         .timeout(_delai);
-    if (r.statusCode != 200) _echec('statut', r);
+
+    if (r.statusCode == 200 || r.statusCode == 202) {
+      return;
+    }
+
+    if (r.statusCode == 409) {
+      throw Exception('Ce devis ne peut plus être modifié.');
+    }
+
+    if (r.statusCode == 400) {
+      throw Exception('Statut invalide ou transition interdite.');
+    }
+
+    _echec('statut', r);
   }
 
+  
   // --- Suppression : DELETE /api/v1/devis/{id}/ ---
   Future<void> supprimerDevis(Object id) async {
     final r = await http

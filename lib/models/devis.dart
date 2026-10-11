@@ -1,45 +1,83 @@
 import 'ligne_devis.dart';
 
-/// `refuse` n'existe pas encore côté backend (BROUILLON, ENVOYE, ACCEPTE,
-/// CONVERTI) : à faire ajouter ou à retirer.
-enum StatutDevis { brouillon, envoye, accepte, refuse, converti }
+/// Statuts API : BROUILLON | VALIDE | FACTURE | ANNULE
+enum StatutDevis { brouillon, valide, facture, annule }
 
 extension StatutDevisX on StatutDevis {
   String get label {
     switch (this) {
       case StatutDevis.brouillon:
         return 'Brouillon';
-      case StatutDevis.envoye:
-        return 'Envoyé';
-      case StatutDevis.accepte:
-        return 'Accepté';
-      case StatutDevis.refuse:
-        return 'Refusé';
-      case StatutDevis.converti:
-        return 'Converti en facture';
+      case StatutDevis.valide:
+        return 'Validé';
+      case StatutDevis.facture:
+        return 'Facturé';
+      case StatutDevis.annule:
+        return 'Annulé';
     }
   }
 
-  /// Valeur échangée avec l'API : BROUILLON, ENVOYE, ACCEPTE, CONVERTI...
-  String get apiValue => name.toUpperCase();
+  /// Valeur exacte pour l'API.
+  String get apiValue {
+    switch (this) {
+      case StatutDevis.brouillon:
+        return 'BROUILLON';
+      case StatutDevis.valide:
+        return 'VALIDE';
+      case StatutDevis.facture:
+        return 'FACTURE';
+      case StatutDevis.annule:
+        return 'ANNULE';
+    }
+  }
 
-  static StatutDevis fromApi(String? v) => StatutDevis.values.firstWhere(
-        (s) => s.apiValue == (v ?? '').toUpperCase(),
-    orElse: () => StatutDevis.brouillon,
-  );
+  static StatutDevis fromApi(String? v) {
+    switch ((v ?? '').toUpperCase().trim()) {
+      case 'VALIDE':
+      case 'ENVOYE': // rétrocompat si ancien backend
+        return StatutDevis.valide;
+      case 'FACTURE':
+      case 'CONVERTI':
+      case 'ACCEPTE':
+        return StatutDevis.facture;
+      case 'ANNULE':
+      case 'REFUSE':
+        return StatutDevis.annule;
+      case 'BROUILLON':
+      default:
+        return StatutDevis.brouillon;
+    }
+  }
+
+  /// Transitions autorisées par l'API.
+  /// BROUILLON → VALIDE | ANNULE
+  /// VALIDE → ANNULE
+  /// FACTURE / ANNULE → aucune
+  List<StatutDevis> get transitionsAutorisees {
+    switch (this) {
+      case StatutDevis.brouillon:
+        return [StatutDevis.valide, StatutDevis.annule];
+      case StatutDevis.valide:
+        return [StatutDevis.annule];
+      case StatutDevis.facture:
+      case StatutDevis.annule:
+        return [];
+    }
+  }
 }
 
 class Devis {
   final String? id;
-  final String? numeroDevis; // ex. DEV-2026-001, généré par le backend
+  final String? numeroDevis; // reference API, ex. DEV-A1B2C3D4
   final String clientNom;
   final String? clientTelephone;
   final List<LigneDevis> lignes;
   final DateTime dateEmission;
+  final DateTime? dateValidite;
   final StatutDevis statut;
+  final double? montantTotalApi;
 
-  /// TODO backend : la TVA n'existe pas encore dans leur modèle.
-  /// Gardée localement (0 = non assujetti), non envoyée à l'API.
+  /// Local uniquement (non envoyé à l'API pour l'instant).
   final double tvaTaux;
 
   const Devis({
@@ -49,17 +87,20 @@ class Devis {
     this.clientTelephone,
     required this.lignes,
     required this.dateEmission,
+    this.dateValidite,
     this.statut = StatutDevis.brouillon,
+    this.montantTotalApi,
     this.tvaTaux = 0,
   });
 
   double get sousTotal => lignes.fold(0, (sum, l) => sum + l.totalLigne);
-  double get montantTva => sousTotal * tvaTaux;
-  double get total => sousTotal + montantTva;
 
-  /// Un devis converti (ou refusé) ne doit plus être modifié.
-  bool get estModifiable =>
-      statut == StatutDevis.brouillon || statut == StatutDevis.envoye;
+  double get montantTva => sousTotal * tvaTaux;
+
+  double get total =>
+      montantTotalApi ?? (sousTotal + montantTva);
+
+  bool get estModifiable => statut == StatutDevis.brouillon;
 
   Devis copyWith({
     String? id,
@@ -68,42 +109,63 @@ class Devis {
     String? clientTelephone,
     List<LigneDevis>? lignes,
     DateTime? dateEmission,
+    DateTime? dateValidite,
     StatutDevis? statut,
+    double? montantTotalApi,
     double? tvaTaux,
-  }) =>
-      Devis(
-        id: id ?? this.id,
-        numeroDevis: numeroDevis ?? this.numeroDevis,
-        clientNom: clientNom ?? this.clientNom,
-        clientTelephone: clientTelephone ?? this.clientTelephone,
-        lignes: lignes ?? this.lignes,
-        dateEmission: dateEmission ?? this.dateEmission,
-        statut: statut ?? this.statut,
-        tvaTaux: tvaTaux ?? this.tvaTaux,
-      );
+  }) {
+    return Devis(
+      id: id ?? this.id,
+      numeroDevis: numeroDevis ?? this.numeroDevis,
+      clientNom: clientNom ?? this.clientNom,
+      clientTelephone: clientTelephone ?? this.clientTelephone,
+      lignes: lignes ?? this.lignes,
+      dateEmission: dateEmission ?? this.dateEmission,
+      dateValidite: dateValidite ?? this.dateValidite,
+      statut: statut ?? this.statut,
+      montantTotalApi: montantTotalApi ?? this.montantTotalApi,
+      tvaTaux: tvaTaux ?? this.tvaTaux,
+    );
+  }
 
-  factory Devis.fromJson(Map<String, dynamic> json) => Devis(
-    id: json['id']?.toString(),
-    numeroDevis: json['numero_devis'] as String?,
-    clientNom: json['client_nom'] as String? ?? '',
-    clientTelephone: json['client_telephone'] as String?,
-    lignes: ((json['lignes'] as List?) ?? [])
-        .map((e) => LigneDevis.fromJson(e as Map<String, dynamic>))
-        .toList(),
-    dateEmission:
-    DateTime.tryParse(json['date_emission'] as String? ?? '') ??
-        DateTime.now(),
-    statut: StatutDevisX.fromApi(json['statut'] as String?),
-  );
+  factory Devis.fromJson(Map<String, dynamic> json) {
+    final montantRaw = json['montant_total'];
+    double? montantApi;
+    if (montantRaw is num) {
+      montantApi = montantRaw.toDouble();
+    } else if (montantRaw != null) {
+      montantApi = double.tryParse(montantRaw.toString());
+    }
 
-  /// `numero_devis` et `montant_total` sont gérés par le backend.
-  /// Format de date envoyé : AAAA-MM-JJ (à confirmer avec le backend).
+    return Devis(
+      id: json['id']?.toString(),
+      numeroDevis: (json['reference'] ?? json['numero_devis'])?.toString(),
+      clientNom: json['client_nom']?.toString() ?? '',
+      clientTelephone: json['client_telephone']?.toString(),
+      lignes: ((json['lignes'] as List?) ?? [])
+          .whereType<Map>()
+          .map((e) => LigneDevis.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      dateEmission: DateTime.tryParse(
+            json['date_emission']?.toString() ?? '',
+          ) ??
+          DateTime.now(),
+      dateValidite: DateTime.tryParse(
+        json['date_validite']?.toString() ?? '',
+      ),
+      statut: StatutDevisX.fromApi(json['statut']?.toString()),
+      montantTotalApi: montantApi,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
-    if (id != null) 'id': id,
-    'client_nom': clientNom,
-    'client_telephone': clientTelephone,
-    'lignes': lignes.map((l) => l.toJson()).toList(),
-    'date_emission': dateEmission.toIso8601String().substring(0, 10),
-    'statut': statut.apiValue,
-  };
+        if (id != null) 'id': id,
+        'client_nom': clientNom,
+        if (clientTelephone != null) 'client_telephone': clientTelephone,
+        'lignes': lignes.map((l) => l.toJson()).toList(),
+        if (dateValidite != null)
+          'date_validite':
+              dateValidite!.toIso8601String().substring(0, 10),
+        'statut': statut.apiValue,
+      };
 }

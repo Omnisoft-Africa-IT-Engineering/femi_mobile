@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
 import '../../services/femi_agent_service.dart';
+import '../../services/femi_api_service.dart';
 import 'widgets/continuer_sur_whatsapp_banner.dart';
 import 'widgets/chat_date_badge_widget.dart';
 import 'widgets/chat_input_bar_widget.dart';
@@ -15,14 +16,8 @@ import 'widgets/chat_message_bubble_widget.dart';
 import 'widgets/chat_history_drawer_widget.dart';
 
 class FemiChatScreen extends StatefulWidget {
-  /// Message à envoyer automatiquement à l'agent dès l'ouverture/mise à
-  /// jour de l'écran.
   final String? initialPrompt;
-
-  /// Change à chaque nouvelle demande d'envoi automatique.
   final int promptNonce;
-
-  /// Appelé quand l'utilisateur appuie sur la flèche de retour.
   final VoidCallback? onBack;
 
   const FemiChatScreen({
@@ -42,6 +37,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FemiAgentService _agentService = FemiAgentService();
+  final FemiApiService _apiService = FemiApiService();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final ImagePicker _imagePicker = ImagePicker();
   final AudioRecorder _audioRecorder = AudioRecorder();
@@ -53,6 +49,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   File? _selectedPdf;
 
   int? _handledPromptNonce;
+  String? _conversationIdActive;
 
   final List<Map<String, dynamic>> _messages = [
     {
@@ -78,14 +75,8 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
   void _maybeSendInitialPrompt() {
     final prompt = widget.initialPrompt;
-
-    if (prompt == null || prompt.trim().isEmpty) {
-      return;
-    }
-
-    if (_handledPromptNonce == widget.promptNonce) {
-      return;
-    }
+    if (prompt == null || prompt.trim().isEmpty) return;
+    if (_handledPromptNonce == widget.promptNonce) return;
 
     _handledPromptNonce = widget.promptNonce;
 
@@ -102,9 +93,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
         await _storage.read(key: 'token');
 
     if (token == null || token.isEmpty) {
-      debugPrint(
-        '⚠️ Aucune clé d\'authentification trouvée au chargement du chat.',
-      );
+      debugPrint('⚠️ Aucun token au chargement du chat.');
     }
   }
 
@@ -117,7 +106,104 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   }
 
   // ============================================================
-  // IMAGE : CAMÉRA / GALERIE
+  // HISTORIQUE
+  // ============================================================
+
+  void _nouvelleConversation() {
+    setState(() {
+      _conversationIdActive = null;
+      _messages
+        ..clear()
+        ..add({
+          'text':
+              'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+          'isUser': false,
+          'time': _nowTimeString(),
+        });
+    });
+  }
+
+  Future<void> _ouvrirConversation(ChatHistoryItem item) async {
+    setState(() {
+      _isLoading = true;
+      _messages.clear();
+      _conversationIdActive = item.id;
+    });
+
+    final data = await _apiService.getConversationMessages(
+      item.id,
+      limit: 50,
+    );
+
+    if (!mounted) return;
+
+    if (data == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de charger cette conversation.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final results = (data['results'] as List?) ?? [];
+    final mapped = <Map<String, dynamic>>[];
+
+    for (final raw in results) {
+      if (raw is! Map) continue;
+      final m = Map<String, dynamic>.from(raw);
+
+      final isUser =
+          (m['expediteur']?.toString().toUpperCase() == 'USER');
+      final type = (m['type_message']?.toString().toUpperCase() ?? 'TEXTE');
+      var texte = m['contenu_texte']?.toString();
+      final created = m['created_at']?.toString();
+
+      if (texte == null || texte.isEmpty) {
+        if (type == 'AUDIO') texte = '[Message vocal]';
+        if (type == 'IMAGE') texte = '[Image]';
+      }
+
+      mapped.add({
+        'text': texte,
+        'isUser': isUser,
+        'time': _timeFromIso(created),
+        'type_message': type,
+        'operation_id': m['operation_id'],
+      });
+    }
+
+    setState(() {
+      _messages
+        ..clear()
+        ..addAll(mapped);
+      _isLoading = false;
+    });
+
+    _scrollToBottom();
+  }
+
+  String _nowTimeString() {
+    final now = TimeOfDay.now();
+    return '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _timeFromIso(String? iso) {
+    if (iso == null || iso.length < 16) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      return '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return iso.substring(11, 16);
+    }
+  }
+
+  // ============================================================
+  // IMAGE
   // ============================================================
 
   Future<void> _handlePickImage(bool isCamera) async {
@@ -128,9 +214,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       );
 
       if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-        });
+        setState(() => _selectedImage = File(pickedFile.path));
       }
     } catch (e) {
       if (mounted) {
@@ -145,7 +229,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   }
 
   // ============================================================
-  // PDF — API file_picker 11.x (sans .platform)
+  // PDF
   // ============================================================
 
   Future<void> _handlePickPdf() async {
@@ -157,9 +241,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
       final path = result?.files.single.path;
       if (path != null) {
-        setState(() {
-          _selectedPdf = File(path);
-        });
+        setState(() => _selectedPdf = File(path));
       }
     } catch (e) {
       if (mounted) {
@@ -172,28 +254,22 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       }
     }
   }
-  
+
   // ============================================================
-  // MICRO / ENREGISTREMENT VOCAL
+  // MICRO → transcription puis édition
   // ============================================================
 
   Future<void> _handleMicToggle() async {
     if (_isRecording) {
-      // --- Arrêt de l'enregistrement → transcription ---
       final path = await _audioRecorder.stop();
-
-      setState(() {
-        _isRecording = false;
-      });
-
+      setState(() => _isRecording = false);
       if (path == null) return;
 
-      setState(() {
-        _isLoading = true; // indique "transcription en cours"
-      });
+      setState(() => _isLoading = true);
 
       try {
-        final transcription = await _agentService.transcribeAudio(File(path));
+        final transcription =
+            await _agentService.transcribeAudio(File(path));
 
         if (!mounted) return;
 
@@ -207,7 +283,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           return;
         }
 
-        // Texte dans la barre : l'utilisateur peut modifier puis envoyer
         setState(() {
           _messageController.text = transcription;
           _messageController.selection = TextSelection.fromPosition(
@@ -232,17 +307,12 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           );
         }
       } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
       }
     } else {
-      // --- Démarrage de l'enregistrement ---
       if (await _audioRecorder.hasPermission()) {
-        final Directory appDocDir = await getApplicationDocumentsDirectory();
-        final String filePath =
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final filePath =
             '${appDocDir.path}/vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
         await _audioRecorder.start(
@@ -250,14 +320,13 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           path: filePath,
         );
 
-        setState(() {
-          _isRecording = true;
-        });
+        setState(() => _isRecording = true);
       }
     }
   }
+
   // ============================================================
-  // ENVOI DU MESSAGE
+  // ENVOI
   // ============================================================
 
   Future<void> _sendMessage({File? audioFile}) async {
@@ -272,10 +341,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       return;
     }
 
-    final now = TimeOfDay.now();
-    final timeString =
-        '${now.hour.toString().padLeft(2, '0')}:'
-        '${now.minute.toString().padLeft(2, '0')}';
+    final timeString = _nowTimeString();
 
     final storedToken = await _storage.read(key: 'auth_token') ??
         await _storage.read(key: 'access_token') ??
@@ -304,7 +370,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
         'isUser': true,
         'time': timeString,
       });
-
       _isLoading = true;
       _selectedImage = null;
       _selectedPdf = null;
@@ -318,21 +383,18 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
         text: text.isNotEmpty ? text : null,
         imageFile: imageFileToSend,
         audioFile: audioFile,
-        pdfFile: pdfFileToSend, // important : envoi du PDF au backend
+        pdfFile: pdfFileToSend,
       );
 
-      final respTime = TimeOfDay.now();
-      final respTimeString =
-          '${respTime.hour.toString().padLeft(2, '0')}:'
-          '${respTime.minute.toString().padLeft(2, '0')}';
+      final respTimeString = _nowTimeString();
 
       setState(() {
-        final bool isTransaction = response['isTransaction'] == true ||
+        final isTransaction = response['isTransaction'] == true ||
             response['transaction'] != null ||
             response['id'] != null;
 
-        final dynamic transactionData = response['transaction'] ?? response;
-        final String? messageText = response['message']?.toString();
+        final transactionData = response['transaction'] ?? response;
+        final messageText = response['message']?.toString();
 
         if (isTransaction && response['transaction'] != null) {
           _messages.add({
@@ -350,7 +412,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       });
     } catch (e) {
       final errorMessage = e.toString();
-
       if (mounted) {
         if (errorMessage.contains(
               'Authentication credentials were not provided',
@@ -359,7 +420,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                'Authentification échouée. Veuillez vous reconnecter à votre compte.',
+                'Authentification échouée. Veuillez vous reconnecter.',
               ),
               backgroundColor: Colors.red,
             ),
@@ -375,9 +436,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
         _scrollToBottom();
       }
     }
@@ -424,11 +483,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red, size: 20),
-            onPressed: () {
-              setState(() {
-                _selectedImage = null;
-              });
-            },
+            onPressed: () => setState(() => _selectedImage = null),
           ),
         ],
       ),
@@ -472,11 +527,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.red, size: 20),
-            onPressed: () {
-              setState(() {
-                _selectedPdf = null;
-              });
-            },
+            onPressed: () => setState(() => _selectedPdf = null),
           ),
         ],
       ),
@@ -489,22 +540,8 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       key: _scaffoldKey,
       backgroundColor: const Color(0xFFF7F9FC),
       endDrawer: ChatHistoryDrawerWidget(
-        onNouvelleConversation: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Nouvelle conversation (bientôt disponible)'),
-            ),
-          );
-        },
-        onSelectionnerConversation: (item) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Conversation "${item.title}" (bientôt disponible)',
-              ),
-            ),
-          );
-        },
+        onNouvelleConversation: _nouvelleConversation,
+        onSelectionnerConversation: _ouvrirConversation,
       ),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -543,19 +580,16 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
             tooltip: 'Historique des discussions',
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_outlined,
-              color: Colors.black87,
-            ),
-            onPressed: () {},
-          ),
         ],
       ),
       body: Column(
         children: [
           const SizedBox(height: 8),
-          const ChatDateBadgeWidget(dateText: 'Aujourd\'hui, 10:24'),
+          ChatDateBadgeWidget(
+            dateText: _conversationIdActive != null
+                ? 'Conversation chargée'
+                : 'Aujourd\'hui',
+          ),
           const SizedBox(height: 12),
           Expanded(
             child: ListView.builder(

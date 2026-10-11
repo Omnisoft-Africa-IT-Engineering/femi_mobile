@@ -919,4 +919,83 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
+    // ============================================================
+  // HISTORIQUE DES DISCUSSIONS
+  // GET /api/v1/conversations/
+  // GET /api/v1/conversations/{id}/messages/
+  // ============================================================
+
+  Future<Map<String, dynamic>?> getConversations({
+    int limit = 30,
+    String? before,
+  }) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final params = <String, String>{
+        'limit': '${limit.clamp(1, 100)}',
+        if (before != null && before.isNotEmpty) 'before': before,
+      };
+
+      final uri = Uri.parse('$baseUrl/conversations/').replace(
+        queryParameters: params,
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      debugPrint(
+        'Erreur HTTP Conversations: ${response.statusCode} - ${response.body}',
+      );
+      return null;
+    } catch (e) {
+      debugPrint('Erreur getConversations: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getConversationMessages(
+    String conversationId, {
+    int limit = 50,
+    String? before,
+  }) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final params = <String, String>{
+        'limit': '${limit.clamp(1, 100)}',
+        if (before != null && before.isNotEmpty) 'before': before,
+      };
+
+      final uri = Uri.parse(
+        '$baseUrl/conversations/$conversationId/messages/',
+      ).replace(queryParameters: params);
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      if (response.statusCode == 404) {
+        debugPrint('Conversation introuvable ou non autorisée: $conversationId');
+      } else {
+        debugPrint(
+          'Erreur HTTP Messages: ${response.statusCode} - ${response.body}',
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Erreur getConversationMessages: $e');
+      return null;
+    }
+  }
+
 }
