@@ -1,409 +1,576 @@
 import 'package:flutter/material.dart';
-import '../../models/team_models.dart';
-import '../../services/team_service.dart';
+import '../../services/femi_api_service.dart';
 
-const Color _vert = Color(0xFF0D5C52);
-const Color _vertClair = Color(0xFFEAF6F3);
-const Color _texte = Color(0xFF0F172A);
-const Color _couleurVente = Color(0xFF059669);
+const Color _vert = Color(0xFF006654);
+const Color _fond = Color(0xFFF8F9FE);
+const Color _encre = Color(0xFF0F172A);
 
-String _nombre(double v) {
-  final s = v.round().toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
-    buf.write(s[i]);
-  }
-  return buf.toString();
-}
-
-String _fcfa(double v) => '${_nombre(v)} FCFA';
-
-String _formatDate(DateTime d) {
-  const mois = [
-    'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
-    'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
-  ];
-  return '${d.day} ${mois[d.month - 1]} ${d.year}';
-}
-
-DateTime _jour(DateTime d) => DateTime(d.year, d.month, d.day);
-
-/// Une vente simulée (l'employé ne fait que des ventes, pas de dépenses).
-class _Vente {
-  final String id;
-  final DateTime date;
-  final String heure;
-  final String titre;
-  final double montant;
-  const _Vente(this.id, this.date, this.heure, this.titre, this.montant);
-}
-
-/// Génère 4 ventes simulées dont le total du jour est EXACTEMENT [jour].
-/// Les cartes du haut et la liste sont calculées à partir de ces mêmes ventes,
-/// donc elles sont toujours cohérentes.
-List<_Vente> _ventesSimulees(double jour, DateTime now) {
-  double arrondi(double v) => (v / 100).round() * 100.0;
-  final a = arrondi(jour * 0.6);
-  final b = jour - a;
-  final c = arrondi(jour * 0.8);
-  final d = arrondi(jour * 1.2);
-  final auj = _jour(now);
-  final toutes = [
-    _Vente('v-0004', auj, '16:20', "Vente de 2 cartons de lait", b),
-    _Vente('v-0003', auj, '11:45', "Vente de 3 bidons d'huile", a),
-    _Vente('v-0002', auj.subtract(const Duration(days: 1)), '15:10',
-        'Vente de 10 sacs de riz', c),
-    _Vente('v-0001', auj.subtract(const Duration(days: 8)), '10:05',
-        'Vente de 5 paquets de sucre', d),
-  ];
-  return toutes.where((v) => v.montant > 0).toList();
-}
-
-double _somme(Iterable<_Vente> ventes, DateTime debut, DateTime fin) {
-  final d = _jour(debut);
-  final f = _jour(fin);
-  var total = 0.0;
-  for (final v in ventes) {
-    final j = _jour(v.date);
-    if (!j.isBefore(d) && !j.isAfter(f)) total += v.montant;
-  }
-  return total;
-}
-
-/// Fiche d'un employé : trois cartes de ventes en haut, sélecteur de dates,
-/// puis registre des ventes en bas. Tout est SIMULÉ pour l'instant.
+/// Fiche d'un employé : infos, totaux (aujourd'hui / semaine / mois)
+/// et registre des ventes avec exercice + plage de dates.
 class EmployeeDetailScreen extends StatefulWidget {
-  final String memberId;
-  const EmployeeDetailScreen({super.key, required this.memberId});
+  final String employeId;
+  final String nom;
+
+  const EmployeeDetailScreen({
+    super.key,
+    required this.employeId,
+    required this.nom,
+  });
 
   @override
   State<EmployeeDetailScreen> createState() => _EmployeeDetailScreenState();
 }
 
 class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
-  late DateTimeRange _periode;
+  final FemiApiService _apiService = FemiApiService();
+
+  late Future<Map<String, dynamic>?> _ficheFuture;
+  late Future<Map<String, dynamic>?> _registreFuture;
+
+  late int _exerciceSelectionne;
+  late DateTimeRange _periodeSelectionnee;
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    _periode = DateTimeRange(start: DateTime(now.year, now.month, 1), end: now);
+    final DateTime now = DateTime.now();
+    _exerciceSelectionne = now.year;
+    // Par défaut : du 1er du mois jusqu'à aujourd'hui
+    _periodeSelectionnee = DateTimeRange(
+      start: DateTime(now.year, now.month, 1),
+      end: now,
+    );
+    _ficheFuture = _apiService.getFicheEmploye(widget.employeId);
+    _chargerRegistre();
   }
 
-  Future<void> _choisirDates() async {
-    final now = DateTime.now();
-    final nouvelle = await showDateRangePicker(
-      context: context,
-      initialDateRange: _periode,
-      firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime(now.year, 12, 31),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF006654),
-            onPrimary: Colors.white,
-            onSurface: _texte,
-          ),
-        ),
-        child: child!,
-      ),
+  void _chargerRegistre() {
+    final DateTime fin = _periodeSelectionnee.end;
+    _registreFuture = _apiService.getRegistreEmploye(
+      widget.employeId,
+      debut: _periodeSelectionnee.start,
+      // fin de journée, pour inclure les ventes du dernier jour choisi
+      fin: DateTime(fin.year, fin.month, fin.day, 23, 59, 59),
     );
-    if (nouvelle != null && nouvelle != _periode) {
-      setState(() => _periode = nouvelle);
+  }
+
+  Future<void> _rafraichir() async {
+    setState(() {
+      _ficheFuture = _apiService.getFicheEmploye(widget.employeId);
+      _chargerRegistre();
+    });
+    await _registreFuture;
+  }
+
+  // ---------- Exercice et dates ----------
+
+  void _changerExercice(int nouvelExercice) {
+    setState(() {
+      _exerciceSelectionne = nouvelExercice;
+      final DateTime now = DateTime.now();
+      if (nouvelExercice == now.year) {
+        _periodeSelectionnee = DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: now,
+        );
+      } else {
+        _periodeSelectionnee = DateTimeRange(
+          start: DateTime(nouvelExercice, 1, 1),
+          end: DateTime(nouvelExercice, 12, 31),
+        );
+      }
+      _chargerRegistre();
+    });
+  }
+
+  Future<void> _selectionnerPlageDates() async {
+    final DateTimeRange? nouvellePlage = await showDateRangePicker(
+      context: context,
+      initialDateRange: _periodeSelectionnee,
+      firstDate: DateTime(_exerciceSelectionne, 1, 1),
+      lastDate: DateTime(_exerciceSelectionne, 12, 31),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _vert,
+              onPrimary: Colors.white,
+              onSurface: _encre,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (nouvellePlage != null && nouvellePlage != _periodeSelectionnee) {
+      setState(() {
+        _periodeSelectionnee = nouvellePlage;
+        _chargerRegistre();
+      });
     }
   }
 
-  Future<void> _editPoste(TeamMember m) async {
-    final ctrl = TextEditingController(text: m.poste);
-    final nouveau = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Rôle de ${m.nom}'),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(
-            labelText: 'Rôle ou poste',
-            hintText: 'Ex : Serveuse, Employé 1, Caissier',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: _vert),
-            onPressed: () => Navigator.pop(dialogContext, ctrl.text),
-            child: const Text('Enregistrer'),
-          ),
-        ],
-      ),
-    );
-    if (nouveau != null) {
-      await TeamService.instance.updatePoste(m.id, nouveau);
+  /// Appui sur une des trois cartes : applique la période correspondante.
+  void _appliquerPeriode(String cle) {
+    final DateTime now = DateTime.now();
+    final DateTime aujourdhui = DateTime(now.year, now.month, now.day);
+    late DateTime debut;
+    switch (cle) {
+      case 'aujourdhui':
+        debut = aujourdhui;
+        break;
+      case 'semaine': // la semaine commence le lundi
+        debut = aujourdhui.subtract(Duration(days: now.weekday - 1));
+        break;
+      default:
+        debut = DateTime(now.year, now.month, 1);
     }
+    setState(() {
+      _exerciceSelectionne = now.year;
+      _periodeSelectionnee = DateTimeRange(start: debut, end: now);
+      _chargerRegistre();
+    });
   }
+
+  // ---------- Formats ----------
+
+  String _formatDate(DateTime date) {
+    const mois = [
+      'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
+      'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
+    ];
+    return '${date.day} ${mois[date.month - 1]} ${date.year}';
+  }
+
+  String _formatPlageDates(DateTimeRange plage) {
+    return '${_formatDate(plage.start)} — ${_formatDate(plage.end)}';
+  }
+
+  String _montant(num v, String devise) {
+    final s = v.round().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+      buf.write(s[i]);
+    }
+    return '$buf ${devise == 'XOF' ? 'FCFA' : devise}';
+  }
+
+  // ---------- Interface ----------
 
   @override
   Widget build(BuildContext context) {
-    final service = TeamService.instance;
-    return ListenableBuilder(
-      listenable: service,
-      builder: (context, _) {
-        TeamMember? trouve;
-        for (final x in service.members) {
-          if (x.id == widget.memberId) {
-            trouve = x;
-            break;
-          }
-        }
-        if (trouve == null) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Fiche employé')),
-            body: const Center(child: Text('Employé introuvable.')),
-          );
-        }
-        final m = trouve;
-
-        // ----- Ventes simulées + chiffres cohérents -----
-        final now = DateTime.now();
-        final ventes = _ventesSimulees(m.ventesDuJour, now);
-        final debutSemaine = _jour(now).subtract(Duration(days: now.weekday - 1));
-        final debutMois = DateTime(now.year, now.month, 1);
-        final totalJour = _somme(ventes, now, now);
-        final totalSemaine = _somme(ventes, debutSemaine, now);
-        final totalMois = _somme(ventes, debutMois, now);
-
-        // ----- Liste filtrée par la période choisie -----
-        final d = _jour(_periode.start);
-        final f = _jour(_periode.end);
-        final affichees = ventes.where((v) {
-          final j = _jour(v.date);
-          return !j.isBefore(d) && !j.isAfter(f);
-        }).toList();
-        final totalPeriode =
-        affichees.fold<double>(0, (s, v) => s + v.montant);
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FE),
-          appBar: AppBar(
-            title: const Text('Fiche employé'),
-            actions: [
-              PopupMenuButton<String>(
-                onSelected: (v) {
-                  if (v == 'role') _editPoste(m);
-                  if (v == 'actif') service.setActif(m.id, !m.actif);
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'role',
-                    child: Text('Modifier le rôle'),
-                  ),
-                  PopupMenuItem(
-                    value: 'actif',
-                    child: Text(m.actif
-                        ? 'Désactiver le compte'
-                        : 'Réactiver le compte'),
-                  ),
-                ],
-              ),
-            ],
+    return Scaffold(
+      backgroundColor: _fond,
+      appBar: AppBar(
+        backgroundColor: _fond,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, color: _encre, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          widget.nom,
+          style: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: _encre,
           ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
+        ),
+        centerTitle: false,
+      ),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _rafraichir,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             children: [
-              // ---------- En-tête ----------
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: _vertClair,
-                    foregroundColor: _vert,
-                    child: Text(
-                      m.nom.isEmpty ? '?' : m.nom[0].toUpperCase(),
-                      style: const TextStyle(fontSize: 22),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          m.nom,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          '${m.poste} • ${m.actif ? 'Actif' : 'Désactivé'}',
-                          style: TextStyle(
-                              color: m.actif ? _vert : Colors.grey),
-                        ),
-                        Text(
-                          m.contact,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // ---------- Trois cartes ----------
-              Row(
-                children: [
-                  Expanded(
-                      child: _StatCard(
-                          label: "Aujourd'hui", valeur: totalJour)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: _StatCard(
-                          label: 'Cette semaine', valeur: totalSemaine)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: _StatCard(label: 'Ce mois', valeur: totalMois)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Données simulées pour le moment.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-
-              // ---------- Titre + sélecteur de dates ----------
+              _buildFiche(),
+              const SizedBox(height: 20),
               const Text(
                 'Registre des ventes',
                 style: TextStyle(
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: _texte,
+                  color: _encre,
                 ),
               ),
-              const SizedBox(height: 10),
-              InkWell(
-                onTap: _choisirDates,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            const Icon(Icons.date_range_outlined,
-                                color: Color(0xFF006654), size: 22),
-                            const SizedBox(width: 12),
-                            Flexible(
-                              child: Text(
-                                '${_formatDate(_periode.start)} — ${_formatDate(_periode.end)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: _texte,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.edit_calendar,
-                          color: Color(0xFF64748B), size: 18),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Total des ventes sur la période : ${_fcfa(totalPeriode)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: _vert,
-                ),
+              const SizedBox(height: 16),
+              _SelecteurExercice(
+                exerciceSelectionne: _exerciceSelectionne,
+                onExerciceChange: _changerExercice,
               ),
               const SizedBox(height: 12),
-
-              // ---------- Liste des ventes ----------
-              if (affichees.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Text(
-                      'Aucune vente enregistrée pour cette période.',
-                      style: TextStyle(color: Colors.black45),
-                    ),
-                  ),
-                )
-              else
-                ...affichees.map((v) => _VenteTile(vente: v)),
+              _buildSelecteurDates(),
+              const SizedBox(height: 20),
+              _buildRegistre(),
+              const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // ---------- Fiche : infos + 3 cartes de totaux ----------
+
+  Widget _buildFiche() {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _ficheFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final fiche = snapshot.data;
+        if (fiche == null) {
+          return const Text(
+            'Impossible de charger la fiche.',
+            style: TextStyle(color: Colors.red),
+          );
+        }
+
+        final String devise = (fiche['devise'] ?? 'XOF').toString();
+        final ventes = (fiche['ventes'] ?? {}) as Map<String, dynamic>;
+        final String poste = (fiche['poste'] ?? '').toString();
+        final String email = (fiche['email'] ?? '').toString();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    (fiche['nom_complet'] ?? widget.nom).toString(),
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: _encre,
+                    ),
+                  ),
+                  if (poste.isNotEmpty)
+                    Text(poste, style: const TextStyle(color: Color(0xFF64748B))),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.email_outlined,
+                          size: 16, color: Color(0xFF64748B)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          email,
+                          style: const TextStyle(color: Color(0xFF64748B)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _carteTotal(
+                    "AUJOURD'HUI",
+                    _montant((ventes['aujourdhui'] as num?) ?? 0, devise),
+                    'aujourdhui',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _carteTotal(
+                    'CETTE SEMAINE',
+                    _montant((ventes['semaine'] as num?) ?? 0, devise),
+                    'semaine',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _carteTotal(
+                    'CE MOIS',
+                    _montant((ventes['mois'] as num?) ?? 0, devise),
+                    'mois',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _carteTotal(String titre, String montant, String cle) {
+    return InkWell(
+      onTap: () => _appliquerPeriode(cle),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0EBFF),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              titre,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+                color: Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 8),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                montant,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: _encre,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------- Sélecteur de plage de dates ----------
+
+  Widget _buildSelecteurDates() {
+    return InkWell(
+      onTap: _selectionnerPlageDates,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  const Icon(Icons.date_range_outlined, color: _vert, size: 22),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      _formatPlageDates(_periodeSelectionnee),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: _encre,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.edit_calendar, color: Color(0xFF64748B), size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------- Registre ----------
+
+  Widget _buildRegistre() {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _registreFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final data = snapshot.data;
+        if (data == null) {
+          return const Text(
+            'Impossible de charger le registre.',
+            style: TextStyle(color: Colors.red),
+          );
+        }
+
+        final String devise = (data['devise'] ?? 'XOF').toString();
+        final List ecritures = (data['ecritures'] ?? []) as List;
+        final num total = (data['total_recettes'] as num?) ?? 0;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0EBFF),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TOTAL DES VENTES',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                      color: Color(0xFF475569),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _montant(total, devise),
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: _encre,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (ecritures.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'Aucune vente sur cette période.',
+                    style: TextStyle(color: Colors.black45),
+                  ),
+                ),
+              )
+            else
+              ...ecritures.map((brut) {
+                final e = brut as Map<String, dynamic>;
+                final String id = (e['id'] ?? '').toString();
+                final double montant = (e['montant'] as num?)?.toDouble() ?? 0;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _CarteVente(
+                    id: id.length > 8 ? id.substring(0, 8) : id,
+                    heure: (e['heure'] ?? '').toString(),
+                    titre: (e['titre'] ?? '').toString(),
+                    categorie: (e['categorie'] ?? 'Recette').toString(),
+                    montant: '+ ${_montant(montant, devise)}',
+                  ),
+                );
+              }),
+          ],
         );
       },
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final double valeur;
-  const _StatCard({required this.label, required this.valeur});
+
+// ============================================================
+// Widgets internes (pas besoin de fichiers externes)
+// ============================================================
+
+class _SelecteurExercice extends StatelessWidget {
+  final int exerciceSelectionne;
+  final ValueChanged<int> onExerciceChange;
+
+  const _SelecteurExercice({
+    required this.exerciceSelectionne,
+    required this.onExerciceChange,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      decoration: BoxDecoration(
-        color: _vertClair,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        children: [
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _vert, fontSize: 12),
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              _nombre(valeur),
-              style: const TextStyle(
-                color: _vert,
-                fontWeight: FontWeight.bold,
-                fontSize: 17,
+    final int annee = DateTime.now().year;
+    final List<int> annees = [for (int a = annee; a >= annee - 5; a--) a];
+
+    return PopupMenuButton<int>(
+      onSelected: onExerciceChange,
+      itemBuilder: (_) => annees
+          .map((a) => PopupMenuItem<int>(value: a, child: Text('$a')))
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_outlined,
+                size: 20, color: Color(0xFF64748B)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Exercice',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF64748B),
+                ),
               ),
             ),
-          ),
-          const Text('FCFA', style: TextStyle(color: _vert, fontSize: 11)),
-        ],
+            Text(
+              '$exerciceSelectionne',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _encre,
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, color: _encre),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _VenteTile extends StatelessWidget {
-  final _Vente vente;
-  const _VenteTile({required this.vente});
+class _CarteVente extends StatelessWidget {
+  final String id;
+  final String heure;
+  final String titre;
+  final String categorie;
+  final String montant;
+
+  const _CarteVente({
+    required this.id,
+    required this.heure,
+    required this.titre,
+    required this.categorie,
+    required this.montant,
+  });
 
   @override
   Widget build(BuildContext context) {
+    const Color vert = Color(0xFF059669);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -415,54 +582,50 @@ class _VenteTile extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                _formatDate(vente.date),
-                style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
-              ),
-              Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  vente.heure,
+              Text(id,
                   style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600),
+                      fontSize: 13, color: Color(0xFF64748B))),
+              if (heure.isNotEmpty)
+                Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(heure,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF475569))),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            vente.titre,
+            titre,
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: _texte,
+              color: _encre,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Row(
             children: [
               Container(
                 width: 8,
                 height: 8,
-                decoration: const BoxDecoration(
-                    color: _couleurVente, shape: BoxShape.circle),
+                decoration:
+                const BoxDecoration(color: vert, shape: BoxShape.circle),
               ),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text('Vente',
-                    style: TextStyle(color: Color(0xFF475569))),
+              Expanded(
+                child: Text(categorie,
+                    style: const TextStyle(color: Color(0xFF334155))),
               ),
               Text(
-                '+ ${_fcfa(vente.montant)}',
+                montant,
                 style: const TextStyle(
-                  color: _couleurVente,
-                  fontWeight: FontWeight.bold,
-                ),
+                    fontWeight: FontWeight.bold, color: vert),
               ),
             ],
           ),

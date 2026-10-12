@@ -156,72 +156,72 @@ class FemiApiService {
 // Pour un nouvel utilisateur, aucun token Django n'est stocké.
 // Le compte sera créé après validation du formulaire d'inscription.
 
-Future<Map<String, dynamic>?> googleLogin(String idToken) async {
-  try {
-    final response = await http.post(
-      Uri.parse('$authBaseUrl/public/google-login/'),
-      headers: _buildHeaders(),
-      body: jsonEncode({
-        'id_token': idToken,
-      }),
-    );
+  Future<Map<String, dynamic>?> googleLogin(String idToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$authBaseUrl/public/google-login/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({
+          'id_token': idToken,
+        }),
+      );
 
-    final responseBody = utf8.decode(response.bodyBytes);
+      final responseBody = utf8.decode(response.bodyBytes);
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(responseBody) as Map<String, dynamic>;
 
-      final isNewUser = data['is_new_user'] == true;
+        final isNewUser = data['is_new_user'] == true;
 
-      // ==========================================================
-      // NOUVEL UTILISATEUR
-      // ==========================================================
+        // ==========================================================
+        // NOUVEL UTILISATEUR
+        // ==========================================================
 
-      if (isNewUser) {
-        debugPrint('🆕 Nouvel utilisateur Google détecté.');
+        if (isNewUser) {
+          debugPrint('🆕 Nouvel utilisateur Google détecté.');
+
+          return data;
+        }
+
+        // ==========================================================
+        // UTILISATEUR EXISTANT
+        // ==========================================================
+
+        final token = data['token'] ??
+            data['tokens']?['access'] ??
+            data['access'] ??
+            data['key'];
+
+        if (token != null) {
+          await _storage.write(
+            key: 'auth_token',
+            value: token.toString(),
+          );
+
+          final companyName = data['entreprise_nom'] ??
+              data['company_name'] ??
+              data['username'] ??
+              'Mon Entreprise';
+
+          await _storage.write(
+            key: 'company_name',
+            value: companyName.toString(),
+          );
+        }
 
         return data;
       }
 
-      // ==========================================================
-      // UTILISATEUR EXISTANT
-      // ==========================================================
+      debugPrint(
+        'Google login failed: ${response.statusCode} - $responseBody',
+      );
 
-      final token = data['token'] ??
-          data['tokens']?['access'] ??
-          data['access'] ??
-          data['key'];
-
-      if (token != null) {
-        await _storage.write(
-          key: 'auth_token',
-          value: token.toString(),
-        );
-
-        final companyName = data['entreprise_nom'] ??
-            data['company_name'] ??
-            data['username'] ??
-            'Mon Entreprise';
-
-        await _storage.write(
-          key: 'company_name',
-          value: companyName.toString(),
-        );
-      }
-
-      return data;
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors du login Google: $e');
+      return null;
     }
-
-    debugPrint(
-      'Google login failed: ${response.statusCode} - $responseBody',
-    );
-
-    return null;
-  } catch (e) {
-    debugPrint('Erreur lors du login Google: $e');
-    return null;
   }
-}
   // --- 2. Récupérer le nom de l'entreprise ---
   Future<String> getCompanyName() async {
     final localName = await _storage.read(key: 'company_name');
@@ -241,22 +241,22 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
   // --- Sauvegarder le profil utilisateur dans SQLite ---
   Future<void> _saveProfileLocally(
-    Map<String, dynamic> profile,
-  ) async {
+      Map<String, dynamic> profile,
+      ) async {
     try {
       final username = profile['username']?.toString();
 
       final companyName =
           profile['entreprise_nom']?.toString() ??
-          profile['company_name']?.toString();
+              profile['company_name']?.toString();
 
       final isPro = _extractIsProFromProfile(profile);
 
       final plan =
           profile['plan']?.toString() ??
-          profile['subscription_plan']?.toString() ??
-          profile['subscription_status']?.toString() ??
-          profile['abonnement']?.toString();
+              profile['subscription_plan']?.toString() ??
+              profile['subscription_status']?.toString() ??
+              profile['abonnement']?.toString();
 
       final user = LocalUser(
         username: username,
@@ -276,13 +276,13 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
   // --- Déterminer le statut Pro à partir du profil ---
   bool _extractIsProFromProfile(
-    Map<String, dynamic> profile,
-  ) {
+      Map<String, dynamic> profile,
+      ) {
     final directValue =
         profile['is_pro'] ??
-        profile['isPro'] ??
-        profile['is_premium'] ??
-        profile['pro'];
+            profile['isPro'] ??
+            profile['is_premium'] ??
+            profile['pro'];
 
     if (directValue is bool) {
       return directValue;
@@ -309,9 +309,9 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
     final plan =
         profile['plan'] ??
-        profile['subscription_status'] ??
-        profile['subscription_plan'] ??
-        profile['abonnement'];
+            profile['subscription_status'] ??
+            profile['subscription_plan'] ??
+            profile['abonnement'];
 
     if (plan != null) {
       final value = plan.toString().toLowerCase().trim();
@@ -340,7 +340,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
       if (response.statusCode == 200) {
         final profile =
-            jsonDecode(response.body) as Map<String, dynamic>;
+        jsonDecode(response.body) as Map<String, dynamic>;
 
         // Sauvegarde locale pour les prochains démarrages.
         await _saveProfileLocally(profile);
@@ -354,7 +354,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
       return null;
     }
   }
-  
+
   // --- 4. Récupérer le token stocké localement ---
   Future<String?> getToken() async {
     return await _storage.read(key: 'auth_token');
@@ -449,7 +449,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
- // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
+  // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
   Future<Map<String, dynamic>?> getRegistreJournalier({
     DateTime? dateDebut,
     DateTime? dateFin,
@@ -918,8 +918,222 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
       return false;
     }
   }
+  // ============================================================
+  // GESTION D'ÉQUIPE : routes sous api/v1/ (baseUrl)
+  // Réservées à l'ADMIN, sauf activerCompte (publique).
+  // ============================================================
 
-    // ============================================================
+  // Message d'erreur du serveur : "error" d'abord, puis "detail" (voir la doc API).
+  String _messageErreur(http.Response response) {
+    try {
+      final body = jsonDecode(utf8.decode(response.bodyBytes));
+      if (body is Map) {
+        return (body['error'] ?? body['detail'] ?? 'Erreur ${response.statusCode}')
+            .toString();
+      }
+    } catch (_) {}
+    return 'Erreur ${response.statusCode}';
+  }
+
+  // --- 24. Liste de l'équipe (GET /api/v1/equipe/) ---
+  Future<List<dynamic>?> getEquipe() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+        if (data is Map && data['employes'] is List) {
+          return data['employes'] as List<dynamic>;
+        }
+        return null;
+      }
+      debugPrint('Erreur HTTP Équipe: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de l\'équipe: $e');
+      return null;
+    }
+  }
+
+  // --- 25. Ajouter un employé (POST /api/v1/auth/users/) ---
+  // Succès : map avec 'code_activation' (affiché une seule fois).
+  // Échec : map avec la clé 'error'. Le rôle et l'entreprise sont fixés par le serveur.
+  Future<Map<String, dynamic>> ajouterEmploye({
+    required String nomComplet,
+    required String email,
+    String? poste,
+  }) async {
+    final token = await getToken();
+    if (token == null) return {'error': 'Session expirée, reconnectez-vous.'};
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'nom_complet': nomComplet,
+          'email': email,
+          if (poste != null && poste.isNotEmpty) 'poste': poste,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      debugPrint('Erreur HTTP Ajout Employé: ${response.statusCode} - ${response.body}');
+      return {'error': _messageErreur(response)};
+    } catch (e) {
+      debugPrint('Erreur lors de l\'ajout de l\'employé: $e');
+      return {'error': 'Impossible de joindre le serveur.'};
+    }
+  }
+
+  // --- 26. Nouveau code d'activation
+  //          (POST /api/v1/auth/users/{id}/regenerate-code/) ---
+  Future<Map<String, dynamic>> regenererCodeEmploye(String id) async {
+    final token = await getToken();
+    if (token == null) return {'error': 'Session expirée, reconnectez-vous.'};
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/$id/regenerate-code/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      debugPrint('Erreur HTTP Nouveau Code: ${response.statusCode} - ${response.body}');
+      return {'error': _messageErreur(response)};
+    } catch (e) {
+      debugPrint('Erreur lors de la génération du code: $e');
+      return {'error': 'Impossible de joindre le serveur.'};
+    }
+  }
+
+  // --- 27. Interrupteur actif / inactif (PATCH /api/v1/equipe/{id}/statut/) ---
+  Future<bool> changerStatutEmploye(String id, bool actif) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/equipe/$id/statut/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({'actif': actif}),
+      );
+
+      if (response.statusCode == 200) return true;
+      debugPrint('Erreur HTTP Statut Employé: ${response.statusCode} - ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('Erreur lors du changement de statut: $e');
+      return false;
+    }
+  }
+
+  // --- 28. Fiche employé (GET /api/v1/equipe/{id}/) ---
+  Future<Map<String, dynamic>?> getFicheEmploye(String id) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/$id/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      debugPrint('Erreur HTTP Fiche Employé: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération de la fiche employé: $e');
+      return null;
+    }
+  }
+
+  // --- 30. Registre des ventes d'un employé
+  //          (GET /api/v1/registre-journalier/?utilisateur_id=...&type=RECETTE) ---
+  Future<Map<String, dynamic>?> getRegistreEmploye(
+      String employeId, {
+        required DateTime debut,
+        required DateTime fin,
+      }) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    String iso(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/registre-journalier/?utilisateur_id=$employeId&type=RECETTE'
+              '&date_debut=${iso(debut)}&date_fin=${iso(fin)}',
+        ),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      }
+      debugPrint('Erreur HTTP Registre Employé: ${response.statusCode} - ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('Erreur lors de la récupération du registre de l\'employé: $e');
+      return null;
+    }
+  }
+
+  // --- 29. Activation du compte par l'employé (POST /api/v1/auth/activate/) ---
+  // Route publique : pas de token. Succès : l'employé est connecté tout de suite,
+  // on stocke le token comme login(). Échec : map avec la clé 'error'.
+  Future<Map<String, dynamic>> activerCompte({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/activate/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({
+          'email': email,
+          'code': code,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+
+        final token = data['token'];
+        if (token != null) {
+          await _storage.write(key: 'auth_token', value: token.toString());
+          await _storage.write(
+            key: 'company_name',
+            value: (data['entreprise_nom'] ?? 'Mon Entreprise').toString(),
+          );
+        }
+        return data;
+      }
+      debugPrint('Erreur HTTP Activation: ${response.statusCode} - ${response.body}');
+      return {'error': _messageErreur(response)};
+    } catch (e) {
+      debugPrint('Erreur lors de l\'activation du compte: $e');
+      return {'error': 'Impossible de joindre le serveur.'};
+    }
+  }
+
+  // ============================================================
   // HISTORIQUE DES DISCUSSIONS
   // GET /api/v1/conversations/
   // GET /api/v1/conversations/{id}/messages/
@@ -946,7 +1160,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes))
-            as Map<String, dynamic>;
+        as Map<String, dynamic>;
       }
 
       debugPrint(
@@ -960,10 +1174,10 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
   }
 
   Future<Map<String, dynamic>?> getConversationMessages(
-    String conversationId, {
-    int limit = 50,
-    String? before,
-  }) async {
+      String conversationId, {
+        int limit = 50,
+        String? before,
+      }) async {
     final token = await getToken();
     if (token == null) return null;
 
@@ -981,7 +1195,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
 
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes))
-            as Map<String, dynamic>;
+        as Map<String, dynamic>;
       }
 
       if (response.statusCode == 404) {

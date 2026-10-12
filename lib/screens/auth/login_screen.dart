@@ -5,6 +5,7 @@ import '../../services/femi_api_service.dart'; // Ajuste selon ton chemin si bes
 import '../../states/auth_state.dart';
 import '../onboarding/company_info_screen.dart';
 import '../auth/sign_up_screen.dart';
+import '../auth/activation_compte_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -201,6 +202,21 @@ Future<void> _handleGoogleLogin() async {
       ),
     );
     // TODO: Telegram / Apple plus tard
+  }
+
+  /// Ouvre l'écran d'activation. S'il réussit, il renvoie l'e-mail et le mot
+  /// de passe : on les remplit et on lance la connexion normale.
+  Future<void> _ouvrirActivation() async {
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(builder: (_) => const ActivationCompteScreen()),
+    );
+
+    if (result == null || !mounted) return;
+
+    _emailController.text = result['email'] ?? '';
+    _passwordController.text = result['password'] ?? '';
+    await _handleLogin();
   }
 
   @override
@@ -445,7 +461,21 @@ Future<void> _handleGoogleLogin() async {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Center(
+                  child: TextButton(
+                    onPressed: _ouvrirActivation,
+                    child: const Text(
+                      'Activer mon compte (employé)',
+                      style: TextStyle(
+                        color: _darkGreen,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 32),
+
               ],
             ),
           ),
