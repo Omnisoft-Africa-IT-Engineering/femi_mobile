@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'models/team_models.dart';
 import 'states/auth_state.dart';
+import 'theme/app_colors.dart';
+import 'theme/app_theme.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/femi_chat/femi_chat_screen.dart';
 import 'screens/compte/compte_screen.dart';
@@ -43,11 +45,8 @@ class FemiApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Femi',
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFF7F9FC),
-        fontFamily: 'Roboto',
-        useMaterial3: true,
-      ),
+      // Thème unique de la charte graphique Femi (couleurs, police Poppins, arrondis)
+      theme: AppTheme.light,
       home: const AuthGate(),
       routes: {
         '/subscription': (context) => const SubscriptionPayScreen(),
@@ -179,12 +178,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFF80F2DD) : Colors.transparent,
+              color: isSelected
+                  ? AppColors.emeraude.withValues(alpha: 0.35)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
               icon,
-              color: isSelected ? const Color(0xFF0D5C52) : Colors.grey,
+              color: isSelected ? AppColors.vert : AppColors.gris,
             ),
           ),
           const SizedBox(height: 4),
@@ -193,7 +194,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? const Color(0xFF0D5C52) : Colors.grey,
+              color: isSelected ? AppColors.vert : AppColors.gris,
             ),
           ),
         ],
