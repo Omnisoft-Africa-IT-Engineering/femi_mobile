@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -158,67 +159,84 @@ class FemiApiService {
 
 Future<Map<String, dynamic>?> googleLogin(String idToken) async {
   try {
-    final response = await http.post(
-      Uri.parse('$authBaseUrl/public/google-login/'),
-      headers: _buildHeaders(),
-      body: jsonEncode({
-        'id_token': idToken,
-      }),
-    );
+    debugPrint('🔵 Google : envoi du token au backend...');
+
+    final response = await http
+        .post(
+          Uri.parse('$authBaseUrl/public/google-login/'),
+          headers: _buildHeaders(),
+          body: jsonEncode({
+            'id_token': idToken,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
 
     final responseBody = utf8.decode(response.bodyBytes);
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      final data = jsonDecode(responseBody) as Map<String, dynamic>;
+    debugPrint('🔵 Google HTTP : ${response.statusCode}');
+    debugPrint('🔵 Google réponse : $responseBody');
 
-      final isNewUser = data['is_new_user'] == true;
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      debugPrint(
+        '❌ Google login : ${response.statusCode} - $responseBody',
+      );
+      return null;
+    }
 
-      // ==========================================================
-      // NOUVEL UTILISATEUR
-      // ==========================================================
+    final decoded = jsonDecode(responseBody);
 
-      if (isNewUser) {
-        debugPrint('🆕 Nouvel utilisateur Google détecté.');
+    if (decoded is! Map<String, dynamic>) {
+      debugPrint('❌ Réponse Google invalide.');
+      return null;
+    }
 
-        return data;
-      }
+    final data = Map<String, dynamic>.from(decoded);
 
-      // ==========================================================
-      // UTILISATEUR EXISTANT
-      // ==========================================================
+    final rawNew = data['is_new_user'];
+    final isNewUser = rawNew == true ||
+        rawNew == 1 ||
+        rawNew?.toString().toLowerCase() == 'true';
+    data['is_new_user'] = isNewUser;
 
-      final token = data['token'] ??
-          data['tokens']?['access'] ??
-          data['access'] ??
-          data['key'];
-
-      if (token != null) {
-        await _storage.write(
-          key: 'auth_token',
-          value: token.toString(),
-        );
-
-        final companyName = data['entreprise_nom'] ??
-            data['company_name'] ??
-            data['username'] ??
-            'Mon Entreprise';
-
-        await _storage.write(
-          key: 'company_name',
-          value: companyName.toString(),
-        );
-      }
-
+    if (isNewUser) {
+      debugPrint('🆕 Nouvel utilisateur Google détecté.');
       return data;
     }
 
-    debugPrint(
-      'Google login failed: ${response.statusCode} - $responseBody',
+    final tokens = data['tokens'];
+    final token = data['token'] ??
+        (tokens is Map ? tokens['access'] : null) ??
+        data['access'] ??
+        data['key'];
+
+    if (token == null || token.toString().isEmpty) {
+      debugPrint('❌ Aucun token reçu pour cet utilisateur.');
+      return null;
+    }
+
+    await _storage.write(
+      key: 'auth_token',
+      value: token.toString(),
     );
 
+    final companyName = data['entreprise_nom'] ??
+        data['company_name'] ??
+        data['username'] ??
+        'Mon Entreprise';
+
+    await _storage.write(
+      key: 'company_name',
+      value: companyName.toString(),
+    );
+
+    debugPrint('✅ Connexion Google réussie.');
+    return data;
+  } on TimeoutException {
+    debugPrint('⏱️ Délai dépassé pendant la connexion Google.');
     return null;
-  } catch (e) {
-    debugPrint('Erreur lors du login Google: $e');
+  } catch (e, stackTrace) {
+    debugPrint('❌ Erreur Google : $e');
+    debugPrintStack(stackTrace: stackTrace);
     return null;
   }
 }

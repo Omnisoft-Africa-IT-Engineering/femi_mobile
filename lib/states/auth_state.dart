@@ -127,146 +127,96 @@ class AuthState {
   /// Pour un nouvel utilisateur, aucun compte Django n'est encore créé.
   /// Le formulaire d'inscription doit ensuite être affiché.
 
-  Future<Map<String, dynamic>> loginWithGoogle() async {
-    isLoading.value = true;
-    errorMessage.value = null;
+Future<Map<String, dynamic>> loginWithGoogle() async {
+  isLoading.value = true;
+  errorMessage.value = null;
 
-    try {
-      const String webClientId =
-          '924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com';
+  try {
+    const String webClientId =
+        '924074246865-e085gto40c946rm9abebo9sv89u7g0di.apps.googleusercontent.com';
 
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-        clientId: kIsWeb ? webClientId : null,
-        serverClientId: kIsWeb ? null : webClientId,
-      );
+    final GoogleSignIn googleSignIn = GoogleSignIn(
+      scopes: const ['email', 'profile'],
+      clientId: kIsWeb ? webClientId : null,
+      serverClientId: kIsWeb ? null : webClientId,
+    );
 
-      // ==========================================================
-      // 1. Ouvrir Google
-      // ==========================================================
+    // 1. Ouvrir Google
+    final GoogleSignInAccount? account = await googleSignIn.signIn();
 
-      final GoogleSignInAccount? account =
-      await googleSignIn.signIn();
-
-      if (account == null) {
-        isLoading.value = false;
-
-        return {
-          'success': false,
-          'is_new_user': false,
-        };
-      }
-
-      // ==========================================================
-      // 2. Récupérer l'authentification Google
-      // ==========================================================
-
-      final GoogleSignInAuthentication auth =
-      await account.authentication;
-
-      final String? tokenToSend =
-          auth.idToken ?? auth.accessToken;
-
-      if (tokenToSend == null) {
-        isLoading.value = false;
-
-        errorMessage.value =
-        "Impossible d'obtenir le token Google.";
-
-        return {
-          'success': false,
-          'is_new_user': false,
-        };
-      }
-
-      // ==========================================================
-      // 3. Envoyer le token à Django
-      // ==========================================================
-
-      final data =
-      await _apiService.googleLogin(tokenToSend);
-
-      if (data == null) {
-        isLoading.value = false;
-
-        errorMessage.value =
-        "Échec de la connexion Google.";
-
-        return {
-          'success': false,
-          'is_new_user': false,
-        };
-      }
-
-      // ==========================================================
-      // 4. NOUVEL UTILISATEUR
-      // ==========================================================
-
-      if (data['is_new_user'] == true) {
-        isLoading.value = false;
-
-        debugPrint(
-          '🆕 Google : nouvel utilisateur.',
-        );
-
-        return {
-          'success': true,
-          'is_new_user': true,
-          'google_data': data['google_data'],
-        };
-      }
-
-      // ==========================================================
-      // 5. UTILISATEUR EXISTANT
-      // ==========================================================
-
-      if (data['is_new_user'] == false) {
-        isLoading.value = false;
-
-        if (isLoggedIn.value) {
-          isLoggedIn.value = false;
-        }
-
-        isLoggedIn.value = true;
-
-        await refreshIsProFromBackend();
-
-        return {
-          'success': true,
-          'is_new_user': false,
-        };
-      }
-
-      // ==========================================================
-      // 6. Réponse inattendue
-      // ==========================================================
-
-      isLoading.value = false;
-
-      errorMessage.value =
-      "Réponse inattendue du serveur.";
-
-      return {
-        'success': false,
-        'is_new_user': false,
-      };
-
-    } catch (e) {
-      isLoading.value = false;
-
-      errorMessage.value =
-      "Erreur Google : $e";
-
-      debugPrint(
-        'loginWithGoogle error: $e',
-      );
-
+    if (account == null) {
+      // Annulé par l'utilisateur
       return {
         'success': false,
         'is_new_user': false,
       };
     }
+
+    // 2. Token Google
+    final GoogleSignInAuthentication auth = await account.authentication;
+    final String? tokenToSend = auth.idToken ?? auth.accessToken;
+
+    if (tokenToSend == null || tokenToSend.isEmpty) {
+      errorMessage.value = "Impossible d'obtenir le token Google.";
+      return {
+        'success': false,
+        'is_new_user': false,
+      };
+    }
+
+    // 3. Backend Django
+    final data = await _apiService.googleLogin(tokenToSend);
+
+    if (data == null) {
+      errorMessage.value =
+          'Échec de la connexion Google (serveur ou délai dépassé).';
+      return {
+        'success': false,
+        'is_new_user': false,
+      };
+    }
+
+    // 4. Nouvel utilisateur
+    if (data['is_new_user'] == true) {
+      debugPrint('🆕 Google : nouvel utilisateur → formulaire entreprise.');
+      return {
+        'success': true,
+        'is_new_user': true,
+        'google_data': data['google_data'] ??
+            {
+              'email': account.email,
+              'full_name': account.displayName ?? '',
+            },
+      };
+    }
+
+    // 5. Utilisateur existant
+    if (isLoggedIn.value) {
+      isLoggedIn.value = false;
+    }
+    isLoggedIn.value = true;
+
+    // Ne pas bloquer l'UI
+    unawaited(refreshIsProFromBackend());
+
+    return {
+      'success': true,
+      'is_new_user': false,
+    };
+  } catch (e, st) {
+    errorMessage.value = 'Erreur Google : $e';
+    debugPrint('loginWithGoogle error: $e');
+    debugPrintStack(stackTrace: st);
+    return {
+      'success': false,
+      'is_new_user': false,
+    };
+  } finally {
+    // Toujours arrêter le spinner
+    isLoading.value = false;
   }
+}
+
   Future<bool> register({
     required String username,
     required String password,
