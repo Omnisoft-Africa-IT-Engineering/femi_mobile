@@ -1016,7 +1016,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
-    /// POST /api/auth/change-password/
+  /// POST /api/v1/auth/change-password/
   /// Body : { "old_password": "...", "new_password": "..." }
   Future<bool> changerMotDePasse({
     required String motDePasseActuel,
@@ -1028,7 +1028,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     try {
       final response = await http
           .post(
-            Uri.parse('$authBaseUrl/change-password/'),
+            Uri.parse('$baseUrl/auth/change-password/'),
             headers: _buildHeaders(token),
             body: jsonEncode({
               'old_password': motDePasseActuel,
@@ -1038,6 +1038,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
           .timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
+        debugPrint('✅ Mot de passe changé avec succès.');
         return true;
       }
 
@@ -1051,6 +1052,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
+  
     // ============================================================
   // ÉQUIPE / EMPLOYÉS  (préfixe : /api/v1/)
   // ============================================================
@@ -1258,7 +1260,7 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
-  
+
   /// POST /api/v1/auth/activate/  (public — employé)
   /// Corps : email, code, password
   Future<Map<String, dynamic>> activerCompte({
