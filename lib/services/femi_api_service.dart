@@ -1016,4 +1016,306 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
     }
   }
 
+    /// POST /api/auth/change-password/
+  /// Body : { "old_password": "...", "new_password": "..." }
+  Future<bool> changerMotDePasse({
+    required String motDePasseActuel,
+    required String nouveauMotDePasse,
+  }) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$authBaseUrl/change-password/'),
+            headers: _buildHeaders(token),
+            body: jsonEncode({
+              'old_password': motDePasseActuel,
+              'new_password': nouveauMotDePasse,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return true;
+      }
+
+      debugPrint(
+        'Erreur change-password: ${response.statusCode} - ${response.body}',
+      );
+      return false;
+    } catch (e) {
+      debugPrint('Erreur changerMotDePasse: $e');
+      return false;
+    }
+  }
+
+    // ============================================================
+  // ÉQUIPE / EMPLOYÉS  (préfixe : /api/v1/)
+  // ============================================================
+
+  /// GET /api/v1/equipe/
+  /// Réponse : { "total": N, "employes": [ ... ] }
+  /// GET /api/v1/equipe/
+  /// L'API renvoie { "total": N, "employes": [...] }
+  /// On expose la liste pour team_screen.
+  Future<List<dynamic>?> getEquipe() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+
+        if (data is Map && data['employes'] is List) {
+          return data['employes'] as List<dynamic>;
+        }
+        if (data is List) return data;
+      }
+
+      debugPrint('getEquipe: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getEquipe error: $e');
+      return null;
+    }
+  }
+
+
+  /// PATCH /api/v1/equipe/<id>/statut/
+  /// Corps : { "actif": true|false }
+  Future<bool> changerStatutEmploye(Object id, bool actif) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/equipe/$id/statut/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({'actif': actif}),
+      );
+
+      if (response.statusCode == 200) return true;
+
+      debugPrint(
+        'changerStatutEmploye: ${response.statusCode} ${response.body}',
+      );
+      return false;
+    } catch (e) {
+      debugPrint('changerStatutEmploye error: $e');
+      return false;
+    }
+  }
+
+  /// POST /api/v1/auth/users/<id>/regenerate-code/
+  Future<Map<String, dynamic>> regenererCodeEmploye(Object id) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Non authentifié'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/$id/regenerate-code/'),
+        headers: _buildHeaders(token),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 200) {
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('regenererCodeEmploye error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// POST /api/v1/auth/users/
+  /// Corps : nom_complet, email, poste (facultatif)
+  Future<Map<String, dynamic>> ajouterEmploye({
+    required String nomComplet,
+    required String email,
+    String? poste,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Non authentifié'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'nom_complet': nomComplet,
+          'email': email,
+          if (poste != null && poste.trim().isNotEmpty) 'poste': poste.trim(),
+        }),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('ajouterEmploye error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// GET /api/v1/equipe/<id>/
+  Future<Map<String, dynamic>?> getFicheEmploye(Object employeId) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/$employeId/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      debugPrint('getFicheEmploye: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getFicheEmploye error: $e');
+      return null;
+    }
+  }
+
+  /// GET /api/v1/registre-journalier/?utilisateur_id=&type=RECETTE&...
+  /// GET /api/v1/registre-journalier/?utilisateur_id=&type=RECETTE&...
+  Future<Map<String, dynamic>?> getRegistreEmploye(
+    Object employeId, {
+    DateTime? debut,
+    DateTime? fin,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    final dDebut = debut ?? dateDebut;
+    final dFin = fin ?? dateFin;
+
+    try {
+      final params = <String, String>{
+        'utilisateur_id': employeId.toString(),
+        'type': 'RECETTE',
+      };
+
+      if (dDebut != null) {
+        params['date_debut'] =
+            '${dDebut.year.toString().padLeft(4, '0')}-'
+            '${dDebut.month.toString().padLeft(2, '0')}-'
+            '${dDebut.day.toString().padLeft(2, '0')}';
+      }
+      if (dFin != null) {
+        params['date_fin'] =
+            '${dFin.year.toString().padLeft(4, '0')}-'
+            '${dFin.month.toString().padLeft(2, '0')}-'
+            '${dFin.day.toString().padLeft(2, '0')}';
+      }
+
+      final uri = Uri.parse('$baseUrl/registre-journalier/').replace(
+        queryParameters: params,
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      debugPrint('getRegistreEmploye: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getRegistreEmploye error: $e');
+      return null;
+    }
+  }
+
+  
+  /// POST /api/v1/auth/activate/  (public — employé)
+  /// Corps : email, code, password
+  Future<Map<String, dynamic>> activerCompte({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/activate/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({
+          'email': email.trim(),
+          'code': code.trim(),
+          'password': password,
+        }),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final token = body['token'];
+        if (token != null) {
+          await _storage.write(key: 'auth_token', value: token.toString());
+        }
+
+        final companyName = body['entreprise_nom'];
+        if (companyName != null) {
+          await _storage.write(
+            key: 'company_name',
+            value: companyName.toString(),
+          );
+        }
+
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('activerCompte error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// Helper interne pour décoder le body JSON sans planter.
+  Map<String, dynamic> _decodeBody(http.Response response) {
+    if (response.bodyBytes.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {'data': decoded};
+    } catch (_) {
+      return {'raw': response.body};
+    }
+  }
+
 }
