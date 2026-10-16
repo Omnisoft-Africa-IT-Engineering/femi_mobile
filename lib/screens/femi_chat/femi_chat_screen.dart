@@ -54,7 +54,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   final List<Map<String, dynamic>> _messages = [
     {
       'text':
-          'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+      'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
       'isUser': false,
       'time': '10:24',
     },
@@ -116,7 +116,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
         ..clear()
         ..add({
           'text':
-              'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+          'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
           'isUser': false,
           'time': _nowTimeString(),
         });
@@ -156,7 +156,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       final m = Map<String, dynamic>.from(raw);
 
       final isUser =
-          (m['expediteur']?.toString().toUpperCase() == 'USER');
+      (m['expediteur']?.toString().toUpperCase() == 'USER');
       final type = (m['type_message']?.toString().toUpperCase() ?? 'TEXTE');
       var texte = m['contenu_texte']?.toString();
       final created = m['created_at']?.toString();
@@ -269,7 +269,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
       try {
         final transcription =
-            await _agentService.transcribeAudio(File(path));
+        await _agentService.transcribeAudio(File(path));
 
         if (!mounted) return;
 
@@ -414,8 +414,8 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       final errorMessage = e.toString();
       if (mounted) {
         if (errorMessage.contains(
-              'Authentication credentials were not provided',
-            ) ||
+          'Authentication credentials were not provided',
+        ) ||
             errorMessage.contains('401')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -560,9 +560,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundImage: NetworkImage(
-                'https://i.pravatar.cc/100?img=5',
-              ),
+              backgroundImage: AssetImage('assets/images/avatar_neutre.jpeg'),
             ),
             SizedBox(width: 10),
             Text(
