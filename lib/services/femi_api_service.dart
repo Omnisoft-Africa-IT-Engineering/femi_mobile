@@ -1017,13 +1017,16 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
   }
 
   /// POST /api/v1/auth/change-password/
-  /// Body : { "old_password": "...", "new_password": "..." }
-  Future<bool> changerMotDePasse({
+  /// POST /api/v1/auth/change-password/
+  Future<Map<String, dynamic>> changerMotDePasse({
     required String motDePasseActuel,
     required String nouveauMotDePasse,
+    required String confirmation,
   }) async {
     final token = await getToken();
-    if (token == null) return false;
+    if (token == null) {
+      return {'success': false, 'error': 'Non authentifié'};
+    }
 
     try {
       final response = await http
@@ -1033,25 +1036,43 @@ Future<Map<String, dynamic>?> googleLogin(String idToken) async {
             body: jsonEncode({
               'old_password': motDePasseActuel,
               'new_password': nouveauMotDePasse,
+              'confirm_password': confirmation,
             }),
           )
           .timeout(const Duration(seconds: 30));
 
+      final bodyText = utf8.decode(response.bodyBytes);
+      debugPrint('change-password → ${response.statusCode} $bodyText');
+
       if (response.statusCode == 200 || response.statusCode == 204) {
-        debugPrint('✅ Mot de passe changé avec succès.');
-        return true;
+        return {'success': true};
       }
 
-      debugPrint(
-        'Erreur change-password: ${response.statusCode} - ${response.body}',
-      );
-      return false;
+      String message = 'Échec du changement de mot de passe.';
+      try {
+        final decoded = jsonDecode(bodyText);
+        if (decoded is Map) {
+          final err = decoded['error'] ??
+              decoded['detail'] ??
+              decoded['old_password'] ??
+              decoded['new_password'] ??
+              decoded['confirm_password'];
+          if (err is List && err.isNotEmpty) {
+            message = err.first.toString();
+          } else if (err != null) {
+            message = err.toString();
+          }
+        }
+      } catch (_) {
+        if (bodyText.isNotEmpty) message = bodyText;
+      }
+
+      return {'success': false, 'error': message};
     } catch (e) {
       debugPrint('Erreur changerMotDePasse: $e');
-      return false;
+      return {'success': false, 'error': '$e'};
     }
   }
-
   
     // ============================================================
   // ÉQUIPE / EMPLOYÉS  (préfixe : /api/v1/)

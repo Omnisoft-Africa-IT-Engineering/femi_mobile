@@ -13,6 +13,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   final _actuelCtrl = TextEditingController();
   final _nouveauCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+
   final _api = FemiApiService();
 
   bool _obscureActuel = true;
@@ -36,26 +37,28 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     setState(() => _loading = true);
 
     try {
-      final ok = await _api.changerMotDePasse(
+      final result = await _api.changerMotDePasse(
         motDePasseActuel: _actuelCtrl.text,
         nouveauMotDePasse: _nouveauCtrl.text,
+        confirmation: _confirmCtrl.text,
       );
 
       if (!mounted) return;
 
-      if (ok) {
+      if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Mot de passe mis à jour.'),
+            content: Text('Mot de passe mis à jour avec succès.'),
             backgroundColor: Colors.green,
           ),
         );
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Échec. Vérifiez votre mot de passe actuel.',
+              result['error']?.toString() ??
+                  'Impossible de changer le mot de passe.',
             ),
             backgroundColor: Colors.red,
           ),
@@ -64,7 +67,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('$e'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -90,7 +96,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Saisissez votre mot de passe actuel, puis le nouveau.',
+                  'Pour des raisons de sécurité, saisissez votre mot de passe actuel puis le nouveau.',
                   style: TextStyle(fontSize: 14, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 24),
@@ -99,7 +105,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: Color(0xFF444444),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -108,8 +114,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   obscure: _obscureActuel,
                   onToggle: () =>
                       setState(() => _obscureActuel = !_obscureActuel),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Obligatoire' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Obligatoire';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -117,7 +125,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: Color(0xFF444444),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -126,10 +134,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   obscure: _obscureNouveau,
                   onToggle: () =>
                       setState(() => _obscureNouveau = !_obscureNouveau),
-                  validator: (v) =>
-                      (v == null || v.length < 8)
-                          ? 'Au moins 8 caractères'
-                          : null,
+                  validator: (v) {
+                    if (v == null || v.length < 8) {
+                      return 'Au moins 8 caractères';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -137,7 +147,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF334155),
+                    color: Color(0xFF444444),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -146,10 +156,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   obscure: _obscureConfirm,
                   onToggle: () =>
                       setState(() => _obscureConfirm = !_obscureConfirm),
-                  validator: (v) =>
-                      v != _nouveauCtrl.text
-                          ? 'Les mots de passe ne correspondent pas'
-                          : null,
+                  validator: (v) {
+                    if (v != _nouveauCtrl.text) {
+                      return 'Les mots de passe ne correspondent pas';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 28),
                 SizedBox(
@@ -202,11 +214,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            spreadRadius: 0.5,
-          ),
+          BoxShadow(color: Colors.black12, blurRadius: 6, spreadRadius: 0.5),
         ],
       ),
       child: TextFormField(
