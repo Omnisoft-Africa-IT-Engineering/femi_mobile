@@ -34,12 +34,10 @@ class SubscriptionPayScreen extends StatefulWidget {
   });
 
   /// true si l'écran est ouvert depuis l'onboarding
-  bool get isOnboarding =>
-      email != null && nomEntreprise != null;
+  bool get isOnboarding => email != null && nomEntreprise != null;
 
   @override
-  State<SubscriptionPayScreen> createState() =>
-      _SubscriptionPayScreenState();
+  State<SubscriptionPayScreen> createState() => _SubscriptionPayScreenState();
 }
 
 class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
@@ -102,24 +100,61 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     },
   ];
 
-  /// Tente de créer le compte jusqu'à 3 fois.
-  Future<bool> _creerCompteAvecRetries(
-      Map<String, dynamic> donnees) async {
-    const maxTentatives = 3;
-    final identifiant = donnees['email'] as String;
-    final motDePasse = donnees['password'] as String;
+  /// Mot de passe technique pour les inscriptions Google (password null).
+  String _motDePasseEffectif(Map<String, dynamic> donnees) {
+    final raw = donnees['password'];
+    if (raw is String && raw.trim().isNotEmpty) {
+      return raw.trim();
+    }
+    final email = (donnees['email'] ?? 'user').toString();
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    return 'Gg_${email.hashCode.abs()}_$ts!A1';
+  }
 
-    for (var tentative = 1;
-    tentative <= maxTentatives;
-    tentative++) {
+  String _emailEffectif(Map<String, dynamic> donnees) {
+    final raw = donnees['email'];
+    if (raw is String && raw.trim().isNotEmpty) {
+      return raw.trim();
+    }
+    throw Exception('Email manquant pour créer le compte.');
+  }
+
+  String _nomEntrepriseEffectif(Map<String, dynamic> donnees) {
+    final raw = donnees['nomEntreprise'];
+    if (raw is String && raw.trim().isNotEmpty) {
+      return raw.trim();
+    }
+    return 'Mon entreprise';
+  }
+
+  /// Tente de créer le compte jusqu'à 3 fois.
+  Future<bool> _creerCompteAvecRetries(Map<String, dynamic> donnees) async {
+    const maxTentatives = 3;
+
+    late final String identifiant;
+    late final String motDePasse;
+    late final String nomEntreprise;
+
+    try {
+      identifiant = _emailEffectif(donnees);
+      motDePasse = _motDePasseEffectif(donnees);
+      nomEntreprise = _nomEntrepriseEffectif(donnees);
+    } catch (e) {
+      debugPrint('Données inscription invalides : $e');
+      return false;
+    }
+
+    // Mémorise le mot de passe effectif (utile pour le retry / login)
+    donnees['password'] = motDePasse;
+
+    for (var tentative = 1; tentative <= maxTentatives; tentative++) {
       final success = await AuthState.instance.register(
         username: identifiant,
         password: motDePasse,
-        nomEntreprise: donnees['nomEntreprise'] as String,
+        nomEntreprise: nomEntreprise,
         nomComplet: donnees['nomComplet'] as String?,
         email: identifiant,
-        telephoneWhatsapp:
-        donnees['telephoneWhatsapp'] as String?,
+        telephoneWhatsapp: donnees['telephoneWhatsapp'] as String?,
         secteurNom: donnees['secteurNom'] as String?,
         devise: donnees['devise'] as String?,
         typeEntreprise: donnees['typeEntreprise'] as String?,
@@ -138,16 +173,13 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       }
 
       if (tentative < maxTentatives) {
-        await Future.delayed(
-          Duration(seconds: 2 * tentative),
-        );
+        await Future.delayed(Duration(seconds: 2 * tentative));
       }
     }
 
     return false;
   }
 
-  /// Met à jour la sauvegarde locale.
   Future<void> _finaliserSauvegarde(
       Map<String, dynamic> donnees, {
         required bool formuleActivee,
@@ -165,10 +197,8 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     });
   }
 
-  /// Réessai manuel après paiement confirmé.
   Future<void> _reessayerCreationCompte() async {
     final donnees = _donneesEnAttente;
-
     if (donnees == null) return;
 
     setState(() => _isLoading = true);
@@ -178,12 +208,10 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     if (!mounted) return;
 
     if (success) {
-      final planTitle = donnees['planTitle'] as String;
-      final transactionId =
-      donnees['transactionId'] as String?;
+      final planTitle = (donnees['planTitle'] ?? '').toString();
+      final transactionId = donnees['transactionId']?.toString();
 
-      final formuleActivee =
-      await _activerFormuleCoteServeur(
+      final formuleActivee = await _activerFormuleCoteServeur(
         planTitle: planTitle,
         transactionId: transactionId,
       );
@@ -202,16 +230,12 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Compte créé avec succès ! Bienvenue sur Femi 🎉',
-          ),
+          content: Text('Compte créé avec succès ! Bienvenue sur Femi 🎉'),
           backgroundColor: Colors.green,
         ),
       );
 
-      Navigator.of(context).popUntil(
-            (route) => route.isFirst,
-      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       setState(() => _isLoading = false);
 
@@ -228,7 +252,6 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     }
   }
 
-  /// Active la formule après paiement confirmé.
   Future<bool> _activerFormuleCoteServeur({
     required String planTitle,
     String? transactionId,
@@ -249,24 +272,17 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     );
 
     AuthState.instance.isPro.value = true;
-
     return false;
   }
 
-  // ============================================================
-  // NOUVEAU : PASSER L'ABONNEMENT
-  // ============================================================
-
   Future<void> _passerAbonnement() async {
-    // Sécurité : le bouton ne doit fonctionner
-    // que pendant l'onboarding.
     if (!widget.isOnboarding) return;
 
     setState(() => _isLoading = true);
 
     final donnees = <String, dynamic>{
       'email': widget.email,
-      'password': widget.password,
+      'password': widget.password, // peut être null (Google)
       'nomEntreprise': widget.nomEntreprise,
       'nomComplet': widget.nomComplet,
       'telephoneWhatsapp': widget.telephoneWhatsapp,
@@ -275,45 +291,34 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       'typeEntreprise': widget.typeEntreprise,
     };
 
-    // Sauvegarde de sécurité avant la création du compte.
     await _apiService.savePendingRegistration(donnees);
 
-    final success =
-    await _creerCompteAvecRetries(donnees);
+    final success = await _creerCompteAvecRetries(donnees);
 
     if (!mounted) return;
 
     if (success) {
-      // Aucun abonnement n'est activé ici.
-      // L'utilisateur a simplement choisi de passer.
       await _apiService.clearPendingRegistration();
-
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Compte créé avec succès ! Bienvenue sur Femi 🎉',
-          ),
+          content: Text('Compte créé avec succès ! Bienvenue sur Femi 🎉'),
           backgroundColor: Colors.green,
           behavior: SnackBarBehavior.floating,
         ),
       );
 
-      // AuthGate affichera automatiquement
-      // l'application principale puisque l'utilisateur
-      // est maintenant connecté.
-      Navigator.of(context).popUntil(
-            (route) => route.isFirst,
-      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Impossible de créer le compte. '
-                'Vérifiez votre connexion et réessayez.',
+            AuthState.instance.errorMessage.value ??
+                'Impossible de créer le compte. '
+                    'Vérifiez votre connexion et réessayez.',
           ),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
@@ -322,8 +327,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     }
   }
 
-  Future<void> _gererPaiement(
-      Map<String, dynamic> selectedPlan) async {
+  Future<void> _gererPaiement(Map<String, dynamic> selectedPlan) async {
     setState(() => _isLoading = true);
 
     String firstname;
@@ -333,18 +337,12 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     if (widget.isOnboarding) {
       final parts =
-      widget.nomComplet!.trim().split(RegExp(r'\s+'));
+      (widget.nomComplet ?? '').trim().split(RegExp(r'\s+'));
 
-      firstname =
-      parts.isNotEmpty ? parts.first : widget.nomComplet!;
-
-      lastname =
-      parts.length > 1
-          ? parts.sublist(1).join(' ')
-          : '';
-
+      firstname = parts.isNotEmpty ? parts.first : (widget.nomComplet ?? '');
+      lastname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
       phone = widget.telephoneWhatsapp ?? '';
-      email = widget.email!;
+      email = widget.email ?? '';
     } else {
       firstname = '';
       lastname = '';
@@ -352,13 +350,10 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       email = '';
     }
 
-    final montant =
-    (selectedPlan['amountFcfa'] as double).round();
+    final montant = (selectedPlan['amountFcfa'] as double).round();
 
-    final result =
-    await _fedaPayService.creerPaiement(
-      description:
-      'Abonnement Femi - ${selectedPlan['title']}',
+    final result = await _fedaPayService.creerPaiement(
+      description: 'Abonnement Femi - ${selectedPlan['title']}',
       amount: montant,
       firstname: firstname,
       lastname: lastname,
@@ -368,30 +363,24 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     if (!mounted) return;
 
-    if (!result.success ||
-        result.paymentUrl == null) {
+    if (!result.success || result.paymentUrl == null) {
       setState(() => _isLoading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.message ??
-                "Impossible d'initier le paiement.",
+            result.message ?? "Impossible d'initier le paiement.",
           ),
           backgroundColor: Colors.red,
         ),
       );
-
       return;
     }
 
-    final paiementReussi =
-    await Navigator.of(context).push<bool>(
+    final paiementReussi = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => PaymentWebViewScreen(
           paymentUrl: result.paymentUrl!,
-          callbackUrlPrefix:
-          FedaPayService.callbackUrlPrefix,
+          callbackUrlPrefix: FedaPayService.callbackUrlPrefix,
         ),
       ),
     );
@@ -400,31 +389,24 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     if (paiementReussi != true) {
       setState(() => _isLoading = false);
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Paiement annulé ou échoué.',
-          ),
+          content: Text('Paiement annulé ou échoué.'),
           backgroundColor: Colors.orange,
         ),
       );
-
       return;
     }
 
-    // Paiement confirmé.
     if (widget.isOnboarding) {
-      final planTitle =
-      selectedPlan['title'] as String;
+      final planTitle = selectedPlan['title'] as String;
 
       final donnees = <String, dynamic>{
         'email': widget.email,
-        'password': widget.password,
+        'password': widget.password, // peut être null (Google)
         'nomEntreprise': widget.nomEntreprise,
         'nomComplet': widget.nomComplet,
-        'telephoneWhatsapp':
-        widget.telephoneWhatsapp,
+        'telephoneWhatsapp': widget.telephoneWhatsapp,
         'secteurNom': widget.secteurNom,
         'devise': widget.devise ?? 'FCFA',
         'typeEntreprise': widget.typeEntreprise,
@@ -432,18 +414,14 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         'transactionId': result.transactionId,
       };
 
-      await _apiService.savePendingRegistration(
-        donnees,
-      );
+      await _apiService.savePendingRegistration(donnees);
 
-      final success =
-      await _creerCompteAvecRetries(donnees);
+      final success = await _creerCompteAvecRetries(donnees);
 
       if (!mounted) return;
 
       if (success) {
-        final formuleActivee =
-        await _activerFormuleCoteServeur(
+        final formuleActivee = await _activerFormuleCoteServeur(
           planTitle: planTitle,
           transactionId: result.transactionId,
         );
@@ -460,17 +438,14 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Compte créé et formule $planTitle '
-                  'activée ! Bienvenue sur Femi 🎉',
+              'Compte créé et formule $planTitle activée ! Bienvenue sur Femi 🎉',
             ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
 
-        Navigator.of(context).popUntil(
-              (route) => route.isFirst,
-        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       } else {
         setState(() {
           _isLoading = false;
@@ -478,16 +453,12 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
           _donneesEnAttente = donnees;
         });
       }
-
       return;
     }
 
-    // Compte existant : activation de l'offre.
-    final planTitle =
-    selectedPlan['title'] as String;
+    final planTitle = selectedPlan['title'] as String;
 
-    final formuleActivee =
-    await _activerFormuleCoteServeur(
+    final formuleActivee = await _activerFormuleCoteServeur(
       planTitle: planTitle,
       transactionId: result.transactionId,
     );
@@ -507,8 +478,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Formule ${selectedPlan['title']} '
-              'activée avec succès !',
+          'Formule ${selectedPlan['title']} activée avec succès !',
         ),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
@@ -516,7 +486,6 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     );
 
     Navigator.of(context).pop(true);
-
     setState(() => _isLoading = false);
   }
 
@@ -538,8 +507,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       return _buildEcranRecuperation();
     }
 
-    final selectedPlan =
-    _plans[_selectedPlanIndex];
+    final selectedPlan = _plans[_selectedPlanIndex];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -547,10 +515,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.close,
-            color: Colors.black87,
-          ),
+          icon: const Icon(Icons.close, color: Colors.black87),
           onPressed: () => widget.isOnboarding
               ? Navigator.pop(context)
               : Navigator.pop(context, false),
@@ -572,49 +537,33 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (widget.targetFeature != null)
                       TargetFeatureBannerWidget(
-                        targetFeature:
-                        widget.targetFeature!,
+                        targetFeature: widget.targetFeature!,
                       ),
-
                     Row(
-                      children:
-                      List.generate(_plans.length, (index) {
+                      children: List.generate(_plans.length, (index) {
                         return Expanded(
                           child: Padding(
                             padding: EdgeInsets.only(
-                              right: index <
-                                  _plans.length - 1
-                                  ? 8.0
-                                  : 0.0,
+                              right: index < _plans.length - 1 ? 8.0 : 0.0,
                             ),
                             child: PlanTabWidget(
                               plan: _plans[index],
-                              isSelected:
-                              _selectedPlanIndex ==
-                                  index,
+                              isSelected: _selectedPlanIndex == index,
                               onTap: () => setState(
-                                    () => _selectedPlanIndex =
-                                    index,
+                                    () => _selectedPlanIndex = index,
                               ),
                             ),
                           ),
                         );
                       }),
                     ),
-
                     const SizedBox(height: 20),
-
-                    PlanDetailCardWidget(
-                      plan: selectedPlan,
-                    ),
-
+                    PlanDetailCardWidget(plan: selectedPlan),
                     const SizedBox(height: 24),
-
                     const Text(
                       'Méthode de paiement',
                       style: TextStyle(
@@ -623,45 +572,29 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                         color: Colors.black87,
                       ),
                     ),
-
                     const SizedBox(height: 12),
-
                     PaymentOptionCardWidget(
                       index: 0,
-                      groupValue:
-                      _selectedPaymentMethod,
+                      groupValue: _selectedPaymentMethod,
                       icon: Icons.phone_android,
                       title: 'Mobile Money',
-                      subtitle:
-                      'Flooz, T-Money, Wave, MoMo',
+                      subtitle: 'Flooz, T-Money, Wave, MoMo',
                       onChanged: (val) {
                         if (val != null) {
-                          setState(
-                                () =>
-                            _selectedPaymentMethod =
-                                val,
-                          );
+                          setState(() => _selectedPaymentMethod = val);
                         }
                       },
                     ),
-
                     const SizedBox(height: 10),
-
                     PaymentOptionCardWidget(
                       index: 1,
-                      groupValue:
-                      _selectedPaymentMethod,
+                      groupValue: _selectedPaymentMethod,
                       icon: Icons.credit_card,
                       title: 'Carte Bancaire',
-                      subtitle:
-                      'Visa, Mastercard',
+                      subtitle: 'Visa, Mastercard',
                       onChanged: (val) {
                         if (val != null) {
-                          setState(
-                                () =>
-                            _selectedPaymentMethod =
-                                val,
-                          );
+                          setState(() => _selectedPaymentMethod = val);
                         }
                       },
                     ),
@@ -669,22 +602,15 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                 ),
               ),
             ),
-
-            // ======================================================
-            // BOUTONS
-            // ======================================================
-
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color:
-                    Colors.black.withOpacity(0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 10,
-                    offset:
-                    const Offset(0, -4),
+                    offset: const Offset(0, -4),
                   ),
                 ],
               ),
@@ -694,28 +620,21 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton(
-                      style:
-                      ElevatedButton.styleFrom(
-                        backgroundColor:
-                        const Color(0xFF0D5C52),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0D5C52),
                         elevation: 0,
-                        shape:
-                        RoundedRectangleBorder(
-                          borderRadius:
-                          BorderRadius.circular(14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       onPressed: _isLoading
                           ? null
-                          : () => _gererPaiement(
-                        selectedPlan,
-                      ),
+                          : () => _gererPaiement(selectedPlan),
                       child: _isLoading
                           ? const SizedBox(
                         height: 24,
                         width: 24,
-                        child:
-                        CircularProgressIndicator(
+                        child: CircularProgressIndicator(
                           color: Colors.white,
                           strokeWidth: 2.5,
                         ),
@@ -724,39 +643,27 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                         widget.isOnboarding
                             ? 'Créer mon compte (${selectedPlan['title']} — ${_fcfa(selectedPlan['amountFcfa'])})'
                             : 'Activer la formule ${selectedPlan['title']} (${_fcfa(selectedPlan['amountFcfa'])})',
-                        style:
-                        const TextStyle(
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
-                          fontWeight:
-                          FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
-
-                  // ==================================================
-                  // NOUVEAU BOUTON "PASSER"
-                  // Affiché UNIQUEMENT pendant l'onboarding.
-                  // ==================================================
-
                   if (widget.isOnboarding) ...[
                     const SizedBox(height: 8),
-
                     SizedBox(
                       width: double.infinity,
                       height: 46,
                       child: TextButton(
-                        onPressed: _isLoading
-                            ? null
-                            : _passerAbonnement,
+                        onPressed: _isLoading ? null : _passerAbonnement,
                         child: const Text(
                           'Passer',
                           style: TextStyle(
                             color: Colors.black54,
                             fontSize: 15,
-                            fontWeight:
-                            FontWeight.w600,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -771,16 +678,11 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     );
   }
 
-  /// Écran de récupération après paiement confirmé
-  /// mais création du compte échouée.
   Widget _buildEcranRecuperation() {
-    final transactionId =
-    _donneesEnAttente?['transactionId']
-    as String?;
+    final transactionId = _donneesEnAttente?['transactionId']?.toString();
 
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -797,20 +699,16 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       ),
       body: SafeArea(
         child: Padding(
-          padding:
-          const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment:
-            MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(
                 Icons.warning_amber_rounded,
                 color: Colors.orange,
                 size: 56,
               ),
-
               const SizedBox(height: 16),
-
               const Text(
                 'Votre paiement a bien été confirmé, '
                     'mais la création de votre compte a échoué '
@@ -821,22 +719,17 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                   color: Color(0xFF444444),
                 ),
               ),
-
               const SizedBox(height: 16),
-
               if (transactionId != null) ...[
                 Container(
                   width: double.infinity,
-                  padding:
-                  const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
-                    borderRadius:
-                    BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Référence de transaction',
@@ -848,10 +741,8 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                       const SizedBox(height: 2),
                       Text(
                         transactionId,
-                        style:
-                        const TextStyle(
-                          fontWeight:
-                          FontWeight.w700,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
                           fontSize: 14,
                         ),
                       ),
@@ -860,7 +751,6 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
-
               Text(
                 'Vos informations sont sauvegardées — '
                     'vous ne serez pas débité une seconde fois '
@@ -872,26 +762,17 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                   color: Colors.grey[600],
                 ),
               ),
-
               const SizedBox(height: 32),
-
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : _reessayerCreationCompte,
-                  style:
-                  ElevatedButton.styleFrom(
-                    backgroundColor:
-                    const Color(0xFF0D5C52),
-                    foregroundColor:
-                    Colors.white,
-                    shape:
-                    RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(14),
+                  onPressed: _isLoading ? null : _reessayerCreationCompte,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D5C52),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     elevation: 0,
                   ),
@@ -899,8 +780,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                       ? const SizedBox(
                     height: 22,
                     width: 22,
-                    child:
-                    CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       color: Colors.white,
                       strokeWidth: 2.5,
                     ),
@@ -909,8 +789,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                     'Réessayer',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight:
-                      FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

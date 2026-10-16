@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -44,12 +45,21 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
   bool _isLoading = false;
   bool _isRecording = false;
+  bool _isPaused = false;
+  Duration _recordingDuration = Duration.zero;
+  Timer? _recordingTimer;
+  String? _recordingPath;
 
   File? _selectedImage;
   File? _selectedPdf;
 
   int? _handledPromptNonce;
   String? _conversationIdActive;
+
+  static const int _messagesParPage = 50;
+  bool _chargementAnciensMessages = false;
+  bool _peutChargerAnciensMessages = true;
+  String? _nextBefore;
 
   final List<Map<String, dynamic>> _messages = [
     {
@@ -63,7 +73,9 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _checkAuthenticationStatus();
+    _chargerConversationRecente();
     _maybeSendInitialPrompt();
   }
 
@@ -99,10 +111,83 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
   @override
   void dispose() {
+    _recordingTimer?.cancel();
+    _scrollController.removeListener(_onScroll);
     _messageController.dispose();
     _scrollController.dispose();
     _audioRecorder.dispose();
     super.dispose();
+  }
+
+  // ============================================================
+  // SCROLL + PAGINATION
+  // ============================================================
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_conversationIdActive == null) return;
+    if (_chargementAnciensMessages || !_peutChargerAnciensMessages) return;
+
+    if (_scrollController.position.pixels <= 80) {
+      _chargerAnciensMessages();
+    }
+  }
+
+  List<Map<String, dynamic>> _mapApiMessages(List results) {
+    final mapped = <Map<String, dynamic>>[];
+
+    for (final raw in results) {
+      if (raw is! Map) continue;
+      final m = Map<String, dynamic>.from(raw);
+
+      final isUser = m['expediteur']?.toString().toUpperCase() == 'USER';
+      final type = m['type_message']?.toString().toUpperCase() ?? 'TEXTE';
+      var texte = m['contenu_texte']?.toString();
+      final created = m['created_at']?.toString();
+
+      if (texte == null || texte.isEmpty) {
+        if (type == 'AUDIO') texte = '[Message vocal]';
+        if (type == 'IMAGE') texte = '[Image]';
+      }
+
+      mapped.add({
+        'id': m['id']?.toString(),
+        'text': texte,
+        'isUser': isUser,
+        'time': _timeFromIso(created),
+        'created_at': created,
+        'type_message': type,
+        'operation_id': m['operation_id'],
+      });
+    }
+    return mapped;
+  }
+
+  Future<void> _chargerConversationRecente() async {
+    setState(() => _isLoading = true);
+
+    final data = await _apiService.getConversations(limit: 1);
+    if (!mounted) return;
+
+    final results = (data?['results'] as List?) ?? [];
+    if (results.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final first = results.first;
+    if (first is! Map) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    final id = first['id']?.toString();
+    if (id == null || id.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    await _ouvrirConversationParId(id);
   }
 
   // ============================================================
@@ -112,6 +197,9 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   void _nouvelleConversation() {
     setState(() {
       _conversationIdActive = null;
+      _nextBefore = null;
+      _peutChargerAnciensMessages = true;
+      _chargementAnciensMessages = false;
       _messages
         ..clear()
         ..add({
@@ -124,15 +212,22 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   }
 
   Future<void> _ouvrirConversation(ChatHistoryItem item) async {
+    await _ouvrirConversationParId(item.id);
+  }
+
+  Future<void> _ouvrirConversationParId(String conversationId) async {
     setState(() {
       _isLoading = true;
       _messages.clear();
-      _conversationIdActive = item.id;
+      _conversationIdActive = conversationId;
+      _nextBefore = null;
+      _peutChargerAnciensMessages = true;
+      _chargementAnciensMessages = false;
     });
 
     final data = await _apiService.getConversationMessages(
-      item.id,
-      limit: 50,
+      conversationId,
+      limit: _messagesParPage,
     );
 
     if (!mounted) return;
@@ -149,40 +244,95 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     }
 
     final results = (data['results'] as List?) ?? [];
-    final mapped = <Map<String, dynamic>>[];
-
-    for (final raw in results) {
-      if (raw is! Map) continue;
-      final m = Map<String, dynamic>.from(raw);
-
-      final isUser =
-      (m['expediteur']?.toString().toUpperCase() == 'USER');
-      final type = (m['type_message']?.toString().toUpperCase() ?? 'TEXTE');
-      var texte = m['contenu_texte']?.toString();
-      final created = m['created_at']?.toString();
-
-      if (texte == null || texte.isEmpty) {
-        if (type == 'AUDIO') texte = '[Message vocal]';
-        if (type == 'IMAGE') texte = '[Image]';
-      }
-
-      mapped.add({
-        'text': texte,
-        'isUser': isUser,
-        'time': _timeFromIso(created),
-        'type_message': type,
-        'operation_id': m['operation_id'],
-      });
-    }
+    final mapped = _mapApiMessages(results);
 
     setState(() {
       _messages
         ..clear()
         ..addAll(mapped);
+      _nextBefore = data['next_before']?.toString();
+      _peutChargerAnciensMessages = data['has_more'] == true;
       _isLoading = false;
     });
 
     _scrollToBottom();
+  }
+
+  Future<void> _chargerAnciensMessages() async {
+    final conversationId = _conversationIdActive;
+    if (conversationId == null) return;
+    if (_chargementAnciensMessages || !_peutChargerAnciensMessages) return;
+
+    final before = _nextBefore;
+    if (before == null || before.isEmpty) {
+      setState(() => _peutChargerAnciensMessages = false);
+      return;
+    }
+
+    setState(() => _chargementAnciensMessages = true);
+
+    final oldPixels =
+    _scrollController.hasClients ? _scrollController.position.pixels : 0.0;
+    final oldMax = _scrollController.hasClients
+        ? _scrollController.position.maxScrollExtent
+        : 0.0;
+
+    try {
+      final data = await _apiService.getConversationMessages(
+        conversationId,
+        limit: _messagesParPage,
+        before: before,
+      );
+
+      if (!mounted) return;
+
+      if (data == null) {
+        setState(() => _chargementAnciensMessages = false);
+        return;
+      }
+
+      final results = (data['results'] as List?) ?? [];
+      final older = _mapApiMessages(results);
+
+      final existingIds = _messages
+          .map((m) => m['id']?.toString())
+          .whereType<String>()
+          .toSet();
+      older.removeWhere((m) {
+        final id = m['id']?.toString();
+        return id != null && existingIds.contains(id);
+      });
+
+      if (older.isEmpty) {
+        setState(() {
+          _chargementAnciensMessages = false;
+          _peutChargerAnciensMessages = data['has_more'] == true;
+          _nextBefore = data['next_before']?.toString();
+        });
+        return;
+      }
+
+      setState(() {
+        _messages.insertAll(0, older);
+        _nextBefore = data['next_before']?.toString();
+        _peutChargerAnciensMessages = data['has_more'] == true;
+        _chargementAnciensMessages = false;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        final newMax = _scrollController.position.maxScrollExtent;
+        final delta = newMax - oldMax;
+        _scrollController.jumpTo(
+          (oldPixels + delta).clamp(0.0, newMax),
+        );
+      });
+    } catch (e) {
+      debugPrint('Erreur anciens messages: $e');
+      if (mounted) {
+        setState(() => _chargementAnciensMessages = false);
+      }
+    }
   }
 
   String _nowTimeString() {
@@ -203,7 +353,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   }
 
   // ============================================================
-  // IMAGE
+  // IMAGE / PDF
   // ============================================================
 
   Future<void> _handlePickImage(bool isCamera) async {
@@ -227,10 +377,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       }
     }
   }
-
-  // ============================================================
-  // PDF
-  // ============================================================
 
   Future<void> _handlePickPdf() async {
     try {
@@ -256,72 +402,165 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   }
 
   // ============================================================
-  // MICRO → transcription puis édition
+  // MICRO STYLE WHATSAPP → transcription
   // ============================================================
 
-  Future<void> _handleMicToggle() async {
-    if (_isRecording) {
-      final path = await _audioRecorder.stop();
-      setState(() => _isRecording = false);
-      if (path == null) return;
-
-      setState(() => _isLoading = true);
-
-      try {
-        final transcription =
-        await _agentService.transcribeAudio(File(path));
-
-        if (!mounted) return;
-
-        if (transcription.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Aucune parole détectée. Réessayez.'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-          return;
-        }
-
+  void _startRecordingTimer() {
+    _recordingTimer?.cancel();
+    _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_isPaused && mounted) {
         setState(() {
-          _messageController.text = transcription;
-          _messageController.selection = TextSelection.fromPosition(
-            TextPosition(offset: transcription.length),
-          );
+          _recordingDuration += const Duration(seconds: 1);
         });
+      }
+    });
+  }
 
+  Future<void> _startRecording() async {
+    if (!await _audioRecorder.hasPermission()) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Transcription prête. Vérifiez puis envoyez.'),
-            backgroundColor: Color(0xFF006654),
-            duration: Duration(seconds: 2),
+            content: Text('Permission micro refusée.'),
+            backgroundColor: Colors.red,
           ),
         );
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur de transcription : $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
       }
-    } else {
-      if (await _audioRecorder.hasPermission()) {
-        final appDocDir = await getApplicationDocumentsDirectory();
-        final filePath =
-            '${appDocDir.path}/vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      return;
+    }
 
-        await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc),
-          path: filePath,
+    final appDocDir = await getApplicationDocumentsDirectory();
+    final filePath =
+        '${appDocDir.path}/vocal_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+    await _audioRecorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc),
+      path: filePath,
+    );
+
+    setState(() {
+      _isRecording = true;
+      _isPaused = false;
+      _recordingDuration = Duration.zero;
+      _recordingPath = filePath;
+    });
+    _startRecordingTimer();
+  }
+
+  Future<void> _pauseRecording() async {
+    try {
+      await _audioRecorder.pause();
+      if (mounted) setState(() => _isPaused = true);
+    } catch (e) {
+      debugPrint('Pause vocal: $e');
+    }
+  }
+
+  Future<void> _resumeRecording() async {
+    try {
+      await _audioRecorder.resume();
+      if (mounted) setState(() => _isPaused = false);
+    } catch (e) {
+      debugPrint('Resume vocal: $e');
+    }
+  }
+
+  Future<void> _cancelRecording() async {
+    _recordingTimer?.cancel();
+    try {
+      await _audioRecorder.stop();
+    } catch (_) {}
+
+    final path = _recordingPath;
+    if (path != null) {
+      final f = File(path);
+      if (await f.exists()) {
+        await f.delete();
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isRecording = false;
+      _isPaused = false;
+      _recordingDuration = Duration.zero;
+      _recordingPath = null;
+    });
+  }
+
+  /// Arrête le vocal → transcription → texte dans le champ.
+  Future<void> _sendRecording() async {
+    _recordingTimer?.cancel();
+
+    String? path;
+    try {
+      path = await _audioRecorder.stop();
+    } catch (e) {
+      debugPrint('Stop vocal: $e');
+      path = _recordingPath;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _isRecording = false;
+      _isPaused = false;
+      _recordingDuration = Duration.zero;
+      _recordingPath = null;
+      _isLoading = true;
+    });
+
+    if (path == null || path.isEmpty) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final transcription =
+      await _agentService.transcribeAudio(File(path));
+
+      if (!mounted) return;
+
+      try {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+
+      if (transcription.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Aucune parole détectée. Réessayez.'),
+            backgroundColor: Colors.orange,
+          ),
         );
-
-        setState(() => _isRecording = true);
+        return;
       }
+
+      setState(() {
+        _messageController.text = transcription;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: transcription.length),
+        );
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transcription prête. Vérifiez puis envoyez.'),
+          backgroundColor: Color(0xFF006654),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de transcription : $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -507,7 +746,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.10),
+              color: Colors.red.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
@@ -593,9 +832,25 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _messages.length,
+              itemCount:
+              _messages.length + (_chargementAnciensMessages ? 1 : 0),
               itemBuilder: (context, index) {
-                return ChatMessageBubbleWidget(message: _messages[index]);
+                if (_chargementAnciensMessages && index == 0) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                }
+
+                final msgIndex =
+                _chargementAnciensMessages ? index - 1 : index;
+                return ChatMessageBubbleWidget(message: _messages[msgIndex]);
               },
             ),
           ),
@@ -610,16 +865,19 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           if (_selectedImage != null) _buildSelectedImagePreview(),
           if (_selectedPdf != null) _buildSelectedPdfPreview(),
           const ContinuerSurWhatsappBanner(),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: ChatInputBarWidget(
-              controller: _messageController,
-              isRecording: _isRecording,
-              onSend: () => _sendMessage(),
-              onPickImage: _handlePickImage,
-              onPickPdf: _handlePickPdf,
-              onMicToggle: _handleMicToggle,
-            ),
+          ChatInputBarWidget(
+            controller: _messageController,
+            isRecording: _isRecording,
+            isPaused: _isPaused,
+            recordingDuration: _recordingDuration,
+            onSend: () => _sendMessage(),
+            onPickImage: _handlePickImage,
+            onPickPdf: _handlePickPdf,
+            onStartRecording: _startRecording,
+            onPauseRecording: _pauseRecording,
+            onResumeRecording: _resumeRecording,
+            onCancelRecording: _cancelRecording,
+            onSendRecording: _sendRecording,
           ),
         ],
       ),

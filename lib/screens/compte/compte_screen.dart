@@ -110,13 +110,24 @@ class _CompteScreenState extends State<CompteScreen> {
                 isUserPro: isPro,
                 onTap: () => _ouvrirPageControle(const RegistreJournalierScreen(), false),
               ),
-              DocTile(
-                icon: Icons.request_quote_outlined,
-                title: 'Devis',
-                isUserPro: isPro,
-                onTap: () => _ouvrirPageControle(const DevisListScreen(), false),
-              ),
-              DocTile(
+              // Devis : réservé au gérant / ADMIN
+              ValueListenableBuilder<UserRole>(
+                valueListenable: AuthState.instance.role,
+                builder: (context, role, _) {
+                  if (role == UserRole.employe) {
+                    return const SizedBox.shrink();
+                  }
+                  return DocTile(
+                    icon: Icons.request_quote_outlined,
+                    title: 'Devis',
+                    isUserPro: isPro,
+                    onTap: () => _ouvrirPageControle(
+                      const DevisListScreen(),
+                      false,
+                    ),
+                  );
+                },
+              ),              DocTile(
                 icon: Icons.event_note_outlined,
                 title: 'Échéances fiscales',
                 isUserPro: isPro,
@@ -221,7 +232,6 @@ class _CompteScreenState extends State<CompteScreen> {
                   );
                 },
               ),
-
               // Section 4: Actions de compte
               // Bouton 1 : Se déconnecter
               ListTile(

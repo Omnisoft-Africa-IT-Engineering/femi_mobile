@@ -88,14 +88,10 @@ Future<void> _handleGoogleLogin() async {
 
   if (!mounted) return;
 
-  // ==========================================================
-  // GOOGLE ANNULÉ OU ERREUR
-  // ==========================================================
-
+  // Annulé ou erreur
   if (result['success'] != true) {
     final msg = AuthState.instance.errorMessage.value;
-
-    if (msg != null) {
+    if (msg != null && msg.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg),
@@ -103,35 +99,18 @@ Future<void> _handleGoogleLogin() async {
         ),
       );
     }
-
     return;
   }
 
-  // ==========================================================
-  // NOUVEL UTILISATEUR GOOGLE
-  // ==========================================================
-
+  // Nouvel utilisateur → infos entreprise
   if (result['is_new_user'] == true) {
-    final googleData =
-        result['google_data'] as Map<String, dynamic>?;
+    final googleData = result['google_data'];
+    final map = googleData is Map
+        ? Map<String, dynamic>.from(googleData)
+        : <String, dynamic>{};
 
-    if (googleData == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Informations Google manquantes.',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final email =
-        (googleData['email'] ?? '').toString();
-
-    final fullName =
-        (googleData['full_name'] ?? '').toString();
+    final email = (map['email'] ?? '').toString().trim();
+    final fullName = (map['full_name'] ?? map['name'] ?? '').toString().trim();
 
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,8 +124,6 @@ Future<void> _handleGoogleLogin() async {
       return;
     }
 
-    // Pour le moment, on utilise le nom complet
-    // comme nom initial de l'entreprise.
     final nomEntrepriseInitial =
         fullName.isNotEmpty ? fullName : 'Mon entreprise';
 
@@ -156,42 +133,20 @@ Future<void> _handleGoogleLogin() async {
           nomComplet: fullName,
           nomEntrepriseInitial: nomEntrepriseInitial,
           email: email,
-          password: null,
+          password: null, // inscription Google
         ),
       ),
     );
-
     return;
   }
 
-  // ==========================================================
-  // UTILISATEUR GOOGLE EXISTANT
-  // ==========================================================
+  // Utilisateur déjà connu
+  await _registerFcmDevice();
+  if (!mounted) return;
 
-  if (result['is_new_user'] == false) {
-    await _registerFcmDevice();
-
-    if (!mounted) return;
-
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
-
-    return;
+  if (Navigator.of(context).canPop()) {
+    Navigator.of(context).pop();
   }
-
-  // ==========================================================
-  // RÉPONSE INATTENDUE
-  // ==========================================================
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text(
-        'Réponse inattendue du serveur.',
-      ),
-      backgroundColor: Colors.red,
-    ),
-  );
 }
   void _handleSocialLogin(String provider) {
     ScaffoldMessenger.of(context).showSnackBar(

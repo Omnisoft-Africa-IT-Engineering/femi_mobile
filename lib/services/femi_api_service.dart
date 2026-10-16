@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -156,72 +157,89 @@ class FemiApiService {
 // Pour un nouvel utilisateur, aucun token Django n'est stocké.
 // Le compte sera créé après validation du formulaire d'inscription.
 
-  Future<Map<String, dynamic>?> googleLogin(String idToken) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$authBaseUrl/public/google-login/'),
-        headers: _buildHeaders(),
-        body: jsonEncode({
-          'id_token': idToken,
-        }),
-      );
+Future<Map<String, dynamic>?> googleLogin(String idToken) async {
+  try {
+    debugPrint('🔵 Google : envoi du token au backend...');
 
-      final responseBody = utf8.decode(response.bodyBytes);
+    final response = await http
+        .post(
+          Uri.parse('$authBaseUrl/public/google-login/'),
+          headers: _buildHeaders(),
+          body: jsonEncode({
+            'id_token': idToken,
+          }),
+        )
+        .timeout(const Duration(seconds: 60));
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(responseBody) as Map<String, dynamic>;
+    final responseBody = utf8.decode(response.bodyBytes);
 
-        final isNewUser = data['is_new_user'] == true;
+    debugPrint('🔵 Google HTTP : ${response.statusCode}');
+    debugPrint('🔵 Google réponse : $responseBody');
 
-        // ==========================================================
-        // NOUVEL UTILISATEUR
-        // ==========================================================
-
-        if (isNewUser) {
-          debugPrint('🆕 Nouvel utilisateur Google détecté.');
-
-          return data;
-        }
-
-        // ==========================================================
-        // UTILISATEUR EXISTANT
-        // ==========================================================
-
-        final token = data['token'] ??
-            data['tokens']?['access'] ??
-            data['access'] ??
-            data['key'];
-
-        if (token != null) {
-          await _storage.write(
-            key: 'auth_token',
-            value: token.toString(),
-          );
-
-          final companyName = data['entreprise_nom'] ??
-              data['company_name'] ??
-              data['username'] ??
-              'Mon Entreprise';
-
-          await _storage.write(
-            key: 'company_name',
-            value: companyName.toString(),
-          );
-        }
-
-        return data;
-      }
-
+    if (response.statusCode != 200 && response.statusCode != 201) {
       debugPrint(
-        'Google login failed: ${response.statusCode} - $responseBody',
+        '❌ Google login : ${response.statusCode} - $responseBody',
       );
-
-      return null;
-    } catch (e) {
-      debugPrint('Erreur lors du login Google: $e');
       return null;
     }
+
+    final decoded = jsonDecode(responseBody);
+
+    if (decoded is! Map<String, dynamic>) {
+      debugPrint('❌ Réponse Google invalide.');
+      return null;
+    }
+
+    final data = Map<String, dynamic>.from(decoded);
+
+    final rawNew = data['is_new_user'];
+    final isNewUser = rawNew == true ||
+        rawNew == 1 ||
+        rawNew?.toString().toLowerCase() == 'true';
+    data['is_new_user'] = isNewUser;
+
+    if (isNewUser) {
+      debugPrint('🆕 Nouvel utilisateur Google détecté.');
+      return data;
+    }
+
+    final tokens = data['tokens'];
+    final token = data['token'] ??
+        (tokens is Map ? tokens['access'] : null) ??
+        data['access'] ??
+        data['key'];
+
+    if (token == null || token.toString().isEmpty) {
+      debugPrint('❌ Aucun token reçu pour cet utilisateur.');
+      return null;
+    }
+
+    await _storage.write(
+      key: 'auth_token',
+      value: token.toString(),
+    );
+
+    final companyName = data['entreprise_nom'] ??
+        data['company_name'] ??
+        data['username'] ??
+        'Mon Entreprise';
+
+    await _storage.write(
+      key: 'company_name',
+      value: companyName.toString(),
+    );
+
+    debugPrint('✅ Connexion Google réussie.');
+    return data;
+  } on TimeoutException {
+    debugPrint('⏱️ Délai dépassé pendant la connexion Google.');
+    return null;
+  } catch (e, stackTrace) {
+    debugPrint('❌ Erreur Google : $e');
+    debugPrintStack(stackTrace: stackTrace);
+    return null;
   }
+}
   // --- 2. Récupérer le nom de l'entreprise ---
   Future<String> getCompanyName() async {
     final localName = await _storage.read(key: 'company_name');
@@ -241,22 +259,22 @@ class FemiApiService {
 
   // --- Sauvegarder le profil utilisateur dans SQLite ---
   Future<void> _saveProfileLocally(
-      Map<String, dynamic> profile,
-      ) async {
+    Map<String, dynamic> profile,
+  ) async {
     try {
       final username = profile['username']?.toString();
 
       final companyName =
           profile['entreprise_nom']?.toString() ??
-              profile['company_name']?.toString();
+          profile['company_name']?.toString();
 
       final isPro = _extractIsProFromProfile(profile);
 
       final plan =
           profile['plan']?.toString() ??
-              profile['subscription_plan']?.toString() ??
-              profile['subscription_status']?.toString() ??
-              profile['abonnement']?.toString();
+          profile['subscription_plan']?.toString() ??
+          profile['subscription_status']?.toString() ??
+          profile['abonnement']?.toString();
 
       final user = LocalUser(
         username: username,
@@ -276,13 +294,13 @@ class FemiApiService {
 
   // --- Déterminer le statut Pro à partir du profil ---
   bool _extractIsProFromProfile(
-      Map<String, dynamic> profile,
-      ) {
+    Map<String, dynamic> profile,
+  ) {
     final directValue =
         profile['is_pro'] ??
-            profile['isPro'] ??
-            profile['is_premium'] ??
-            profile['pro'];
+        profile['isPro'] ??
+        profile['is_premium'] ??
+        profile['pro'];
 
     if (directValue is bool) {
       return directValue;
@@ -309,9 +327,9 @@ class FemiApiService {
 
     final plan =
         profile['plan'] ??
-            profile['subscription_status'] ??
-            profile['subscription_plan'] ??
-            profile['abonnement'];
+        profile['subscription_status'] ??
+        profile['subscription_plan'] ??
+        profile['abonnement'];
 
     if (plan != null) {
       final value = plan.toString().toLowerCase().trim();
@@ -340,7 +358,7 @@ class FemiApiService {
 
       if (response.statusCode == 200) {
         final profile =
-        jsonDecode(response.body) as Map<String, dynamic>;
+            jsonDecode(response.body) as Map<String, dynamic>;
 
         // Sauvegarde locale pour les prochains démarrages.
         await _saveProfileLocally(profile);
@@ -354,7 +372,7 @@ class FemiApiService {
       return null;
     }
   }
-
+  
   // --- 4. Récupérer le token stocké localement ---
   Future<String?> getToken() async {
     return await _storage.read(key: 'auth_token');
@@ -449,7 +467,7 @@ class FemiApiService {
     }
   }
 
-  // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
+ // --- 9. Obtenir le registre journalier (GET /api/v1/registre-journalier/) ---
   Future<Map<String, dynamic>?> getRegistreJournalier({
     DateTime? dateDebut,
     DateTime? dateFin,
@@ -918,222 +936,8 @@ class FemiApiService {
       return false;
     }
   }
-  // ============================================================
-  // GESTION D'ÉQUIPE : routes sous api/v1/ (baseUrl)
-  // Réservées à l'ADMIN, sauf activerCompte (publique).
-  // ============================================================
 
-  // Message d'erreur du serveur : "error" d'abord, puis "detail" (voir la doc API).
-  String _messageErreur(http.Response response) {
-    try {
-      final body = jsonDecode(utf8.decode(response.bodyBytes));
-      if (body is Map) {
-        return (body['error'] ?? body['detail'] ?? 'Erreur ${response.statusCode}')
-            .toString();
-      }
-    } catch (_) {}
-    return 'Erreur ${response.statusCode}';
-  }
-
-  // --- 24. Liste de l'équipe (GET /api/v1/equipe/) ---
-  Future<List<dynamic>?> getEquipe() async {
-    final token = await getToken();
-    if (token == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/equipe/'),
-        headers: _buildHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        if (data is Map && data['employes'] is List) {
-          return data['employes'] as List<dynamic>;
-        }
-        return null;
-      }
-      debugPrint('Erreur HTTP Équipe: ${response.statusCode} - ${response.body}');
-      return null;
-    } catch (e) {
-      debugPrint('Erreur lors de la récupération de l\'équipe: $e');
-      return null;
-    }
-  }
-
-  // --- 25. Ajouter un employé (POST /api/v1/auth/users/) ---
-  // Succès : map avec 'code_activation' (affiché une seule fois).
-  // Échec : map avec la clé 'error'. Le rôle et l'entreprise sont fixés par le serveur.
-  Future<Map<String, dynamic>> ajouterEmploye({
-    required String nomComplet,
-    required String email,
-    String? poste,
-  }) async {
-    final token = await getToken();
-    if (token == null) return {'error': 'Session expirée, reconnectez-vous.'};
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/users/'),
-        headers: _buildHeaders(token),
-        body: jsonEncode({
-          'nom_complet': nomComplet,
-          'email': email,
-          if (poste != null && poste.isNotEmpty) 'poste': poste,
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      }
-      debugPrint('Erreur HTTP Ajout Employé: ${response.statusCode} - ${response.body}');
-      return {'error': _messageErreur(response)};
-    } catch (e) {
-      debugPrint('Erreur lors de l\'ajout de l\'employé: $e');
-      return {'error': 'Impossible de joindre le serveur.'};
-    }
-  }
-
-  // --- 26. Nouveau code d'activation
-  //          (POST /api/v1/auth/users/{id}/regenerate-code/) ---
-  Future<Map<String, dynamic>> regenererCodeEmploye(String id) async {
-    final token = await getToken();
-    if (token == null) return {'error': 'Session expirée, reconnectez-vous.'};
-
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/users/$id/regenerate-code/'),
-        headers: _buildHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      }
-      debugPrint('Erreur HTTP Nouveau Code: ${response.statusCode} - ${response.body}');
-      return {'error': _messageErreur(response)};
-    } catch (e) {
-      debugPrint('Erreur lors de la génération du code: $e');
-      return {'error': 'Impossible de joindre le serveur.'};
-    }
-  }
-
-  // --- 27. Interrupteur actif / inactif (PATCH /api/v1/equipe/{id}/statut/) ---
-  Future<bool> changerStatutEmploye(String id, bool actif) async {
-    final token = await getToken();
-    if (token == null) return false;
-
-    try {
-      final response = await http.patch(
-        Uri.parse('$baseUrl/equipe/$id/statut/'),
-        headers: _buildHeaders(token),
-        body: jsonEncode({'actif': actif}),
-      );
-
-      if (response.statusCode == 200) return true;
-      debugPrint('Erreur HTTP Statut Employé: ${response.statusCode} - ${response.body}');
-      return false;
-    } catch (e) {
-      debugPrint('Erreur lors du changement de statut: $e');
-      return false;
-    }
-  }
-
-  // --- 28. Fiche employé (GET /api/v1/equipe/{id}/) ---
-  Future<Map<String, dynamic>?> getFicheEmploye(String id) async {
-    final token = await getToken();
-    if (token == null) return null;
-
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/equipe/$id/'),
-        headers: _buildHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      }
-      debugPrint('Erreur HTTP Fiche Employé: ${response.statusCode} - ${response.body}');
-      return null;
-    } catch (e) {
-      debugPrint('Erreur lors de la récupération de la fiche employé: $e');
-      return null;
-    }
-  }
-
-  // --- 30. Registre des ventes d'un employé
-  //          (GET /api/v1/registre-journalier/?utilisateur_id=...&type=RECETTE) ---
-  Future<Map<String, dynamic>?> getRegistreEmploye(
-      String employeId, {
-        required DateTime debut,
-        required DateTime fin,
-      }) async {
-    final token = await getToken();
-    if (token == null) return null;
-
-    String iso(DateTime d) =>
-        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-    try {
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/registre-journalier/?utilisateur_id=$employeId&type=RECETTE'
-              '&date_debut=${iso(debut)}&date_fin=${iso(fin)}',
-        ),
-        headers: _buildHeaders(token),
-      );
-
-      if (response.statusCode == 200) {
-        return jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-      }
-      debugPrint('Erreur HTTP Registre Employé: ${response.statusCode} - ${response.body}');
-      return null;
-    } catch (e) {
-      debugPrint('Erreur lors de la récupération du registre de l\'employé: $e');
-      return null;
-    }
-  }
-
-  // --- 29. Activation du compte par l'employé (POST /api/v1/auth/activate/) ---
-  // Route publique : pas de token. Succès : l'employé est connecté tout de suite,
-  // on stocke le token comme login(). Échec : map avec la clé 'error'.
-  Future<Map<String, dynamic>> activerCompte({
-    required String email,
-    required String code,
-    required String password,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/activate/'),
-        headers: _buildHeaders(),
-        body: jsonEncode({
-          'email': email,
-          'code': code,
-          'password': password,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
-
-        final token = data['token'];
-        if (token != null) {
-          await _storage.write(key: 'auth_token', value: token.toString());
-          await _storage.write(
-            key: 'company_name',
-            value: (data['entreprise_nom'] ?? 'Mon Entreprise').toString(),
-          );
-        }
-        return data;
-      }
-      debugPrint('Erreur HTTP Activation: ${response.statusCode} - ${response.body}');
-      return {'error': _messageErreur(response)};
-    } catch (e) {
-      debugPrint('Erreur lors de l\'activation du compte: $e');
-      return {'error': 'Impossible de joindre le serveur.'};
-    }
-  }
-
-  // ============================================================
+    // ============================================================
   // HISTORIQUE DES DISCUSSIONS
   // GET /api/v1/conversations/
   // GET /api/v1/conversations/{id}/messages/
@@ -1160,7 +964,7 @@ class FemiApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+            as Map<String, dynamic>;
       }
 
       debugPrint(
@@ -1174,10 +978,10 @@ class FemiApiService {
   }
 
   Future<Map<String, dynamic>?> getConversationMessages(
-      String conversationId, {
-        int limit = 50,
-        String? before,
-      }) async {
+    String conversationId, {
+    int limit = 50,
+    String? before,
+  }) async {
     final token = await getToken();
     if (token == null) return null;
 
@@ -1195,7 +999,7 @@ class FemiApiService {
 
       if (response.statusCode == 200) {
         return jsonDecode(utf8.decode(response.bodyBytes))
-        as Map<String, dynamic>;
+            as Map<String, dynamic>;
       }
 
       if (response.statusCode == 404) {
@@ -1209,6 +1013,310 @@ class FemiApiService {
     } catch (e) {
       debugPrint('Erreur getConversationMessages: $e');
       return null;
+    }
+  }
+
+  /// POST /api/v1/auth/change-password/
+  /// Body : { "old_password": "...", "new_password": "..." }
+  Future<bool> changerMotDePasse({
+    required String motDePasseActuel,
+    required String nouveauMotDePasse,
+  }) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/auth/change-password/'),
+            headers: _buildHeaders(token),
+            body: jsonEncode({
+              'old_password': motDePasseActuel,
+              'new_password': nouveauMotDePasse,
+            }),
+          )
+          .timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        debugPrint('✅ Mot de passe changé avec succès.');
+        return true;
+      }
+
+      debugPrint(
+        'Erreur change-password: ${response.statusCode} - ${response.body}',
+      );
+      return false;
+    } catch (e) {
+      debugPrint('Erreur changerMotDePasse: $e');
+      return false;
+    }
+  }
+
+  
+    // ============================================================
+  // ÉQUIPE / EMPLOYÉS  (préfixe : /api/v1/)
+  // ============================================================
+
+  /// GET /api/v1/equipe/
+  /// Réponse : { "total": N, "employes": [ ... ] }
+  /// GET /api/v1/equipe/
+  /// L'API renvoie { "total": N, "employes": [...] }
+  /// On expose la liste pour team_screen.
+  Future<List<dynamic>?> getEquipe() async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(utf8.decode(response.bodyBytes));
+
+        if (data is Map && data['employes'] is List) {
+          return data['employes'] as List<dynamic>;
+        }
+        if (data is List) return data;
+      }
+
+      debugPrint('getEquipe: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getEquipe error: $e');
+      return null;
+    }
+  }
+
+
+  /// PATCH /api/v1/equipe/<id>/statut/
+  /// Corps : { "actif": true|false }
+  Future<bool> changerStatutEmploye(Object id, bool actif) async {
+    final token = await getToken();
+    if (token == null) return false;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$baseUrl/equipe/$id/statut/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({'actif': actif}),
+      );
+
+      if (response.statusCode == 200) return true;
+
+      debugPrint(
+        'changerStatutEmploye: ${response.statusCode} ${response.body}',
+      );
+      return false;
+    } catch (e) {
+      debugPrint('changerStatutEmploye error: $e');
+      return false;
+    }
+  }
+
+  /// POST /api/v1/auth/users/<id>/regenerate-code/
+  Future<Map<String, dynamic>> regenererCodeEmploye(Object id) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Non authentifié'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/$id/regenerate-code/'),
+        headers: _buildHeaders(token),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 200) {
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('regenererCodeEmploye error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// POST /api/v1/auth/users/
+  /// Corps : nom_complet, email, poste (facultatif)
+  Future<Map<String, dynamic>> ajouterEmploye({
+    required String nomComplet,
+    required String email,
+    String? poste,
+  }) async {
+    final token = await getToken();
+    if (token == null) {
+      return {'success': false, 'error': 'Non authentifié'};
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/users/'),
+        headers: _buildHeaders(token),
+        body: jsonEncode({
+          'nom_complet': nomComplet,
+          'email': email,
+          if (poste != null && poste.trim().isNotEmpty) 'poste': poste.trim(),
+        }),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('ajouterEmploye error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// GET /api/v1/equipe/<id>/
+  Future<Map<String, dynamic>?> getFicheEmploye(Object employeId) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/equipe/$employeId/'),
+        headers: _buildHeaders(token),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      debugPrint('getFicheEmploye: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getFicheEmploye error: $e');
+      return null;
+    }
+  }
+
+  /// GET /api/v1/registre-journalier/?utilisateur_id=&type=RECETTE&...
+  /// GET /api/v1/registre-journalier/?utilisateur_id=&type=RECETTE&...
+  Future<Map<String, dynamic>?> getRegistreEmploye(
+    Object employeId, {
+    DateTime? debut,
+    DateTime? fin,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
+    final token = await getToken();
+    if (token == null) return null;
+
+    final dDebut = debut ?? dateDebut;
+    final dFin = fin ?? dateFin;
+
+    try {
+      final params = <String, String>{
+        'utilisateur_id': employeId.toString(),
+        'type': 'RECETTE',
+      };
+
+      if (dDebut != null) {
+        params['date_debut'] =
+            '${dDebut.year.toString().padLeft(4, '0')}-'
+            '${dDebut.month.toString().padLeft(2, '0')}-'
+            '${dDebut.day.toString().padLeft(2, '0')}';
+      }
+      if (dFin != null) {
+        params['date_fin'] =
+            '${dFin.year.toString().padLeft(4, '0')}-'
+            '${dFin.month.toString().padLeft(2, '0')}-'
+            '${dFin.day.toString().padLeft(2, '0')}';
+      }
+
+      final uri = Uri.parse('$baseUrl/registre-journalier/').replace(
+        queryParameters: params,
+      );
+
+      final response = await http.get(uri, headers: _buildHeaders(token));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(utf8.decode(response.bodyBytes))
+            as Map<String, dynamic>;
+      }
+
+      debugPrint('getRegistreEmploye: ${response.statusCode} ${response.body}');
+      return null;
+    } catch (e) {
+      debugPrint('getRegistreEmploye error: $e');
+      return null;
+    }
+  }
+
+
+  /// POST /api/v1/auth/activate/  (public — employé)
+  /// Corps : email, code, password
+  Future<Map<String, dynamic>> activerCompte({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/activate/'),
+        headers: _buildHeaders(),
+        body: jsonEncode({
+          'email': email.trim(),
+          'code': code.trim(),
+          'password': password,
+        }),
+      );
+
+      final body = _decodeBody(response);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final token = body['token'];
+        if (token != null) {
+          await _storage.write(key: 'auth_token', value: token.toString());
+        }
+
+        final companyName = body['entreprise_nom'];
+        if (companyName != null) {
+          await _storage.write(
+            key: 'company_name',
+            value: companyName.toString(),
+          );
+        }
+
+        return {'success': true, ...body};
+      }
+
+      return {
+        'success': false,
+        'error': body['error'] ?? body['detail'] ?? response.body,
+      };
+    } catch (e) {
+      debugPrint('activerCompte error: $e');
+      return {'success': false, 'error': '$e'};
+    }
+  }
+
+  /// Helper interne pour décoder le body JSON sans planter.
+  Map<String, dynamic> _decodeBody(http.Response response) {
+    if (response.bodyBytes.isEmpty) return {};
+    try {
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {'data': decoded};
+    } catch (_) {
+      return {'raw': response.body};
     }
   }
 
