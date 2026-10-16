@@ -64,7 +64,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   final List<Map<String, dynamic>> _messages = [
     {
       'text':
-          'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+      'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
       'isUser': false,
       'time': '10:24',
     },
@@ -204,7 +204,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
         ..clear()
         ..add({
           'text':
-              'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
+          'Bonjour ! Je suis Femi. Comment puis-je vous aider aujourd\'hui ?',
           'isUser': false,
           'time': _nowTimeString(),
         });
@@ -272,7 +272,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     setState(() => _chargementAnciensMessages = true);
 
     final oldPixels =
-        _scrollController.hasClients ? _scrollController.position.pixels : 0.0;
+    _scrollController.hasClients ? _scrollController.position.pixels : 0.0;
     final oldMax = _scrollController.hasClients
         ? _scrollController.position.maxScrollExtent
         : 0.0;
@@ -517,7 +517,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
     try {
       final transcription =
-          await _agentService.transcribeAudio(File(path));
+      await _agentService.transcribeAudio(File(path));
 
       if (!mounted) return;
 
@@ -653,8 +653,8 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       final errorMessage = e.toString();
       if (mounted) {
         if (errorMessage.contains(
-              'Authentication credentials were not provided',
-            ) ||
+          'Authentication credentials were not provided',
+        ) ||
             errorMessage.contains('401')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -799,9 +799,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundImage: NetworkImage(
-                'https://i.pravatar.cc/100?img=5',
-              ),
+              backgroundImage: AssetImage('assets/images/avatar_neutre.jpeg'),
             ),
             SizedBox(width: 10),
             Text(
@@ -835,7 +833,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount:
-                  _messages.length + (_chargementAnciensMessages ? 1 : 0),
+              _messages.length + (_chargementAnciensMessages ? 1 : 0),
               itemBuilder: (context, index) {
                 if (_chargementAnciensMessages && index == 0) {
                   return const Padding(
@@ -851,7 +849,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
                 }
 
                 final msgIndex =
-                    _chargementAnciensMessages ? index - 1 : index;
+                _chargementAnciensMessages ? index - 1 : index;
                 return ChatMessageBubbleWidget(message: _messages[msgIndex]);
               },
             ),

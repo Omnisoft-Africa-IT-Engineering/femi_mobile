@@ -58,12 +58,13 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       'amountFcfa': 7200.0,
       'period': '/ mois',
       'description':
-          'Idéal pour démarrer et gérer les flux quotidiens de votre activité.',
+      'Pour sortir du carnet et du tableur, sans changer vos habitudes.',
       'features': [
-        'Registre journalier de caisse',
-        'Saisie illimitée des transactions',
-        'Support standard par email',
-        'Historique conservé sur 6 mois',
+        'Registre journalier numérique',
+        'Tableau de bord avec KPIs de pilotage',
+        'Enregistrement illimité de vos pièces comptables',
+        'Rappels automatiques des échéances fiscales',
+        'Création de devis',
       ],
       'isPopular': false,
     },
@@ -73,12 +74,13 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       'amountFcfa': 13750.0,
       'period': '/ mois',
       'description':
-          'Pour piloter votre PME comme si vous aviez un comptable à temps plein.',
+      'Pour piloter votre PME comme si vous aviez un comptable à temps plein.',
       'features': [
         'Tout ce qui est inclus dans Micro',
         'Alertes en temps réel sur vos produits les plus performants',
-        'Documents comptables : État, Balance, Grand Livre',
+        'Formation personnalisée de votre équipe',
         'Support prioritaire',
+        'Documents comptables à tout moment : État, Balance, Grand Livre, Balance auxiliaire',
         'Historique conservé d\'une année sur l\'autre',
       ],
       'isPopular': true,
@@ -89,12 +91,13 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
       'amountFcfa': 20300.0,
       'period': '/ mois',
       'description':
-          'Pour les structures multi-établissements avec accompagnement dédié.',
+      'Pour les structures multi-sites qui veulent un accompagnement sur-mesure.',
       'features': [
         'Tout ce qui est inclus dans Pro',
-        'Accompagnement mensuel par un consultant Femi',
-        'Exportation personnalisée des rapports',
-        'Gestion multi-utilisateurs',
+        'Accompagnement dédié par un conseiller',
+        'Intégration avec vos outils existants',
+        'Déclaration de TVA et dépôt de vos documents comptables',
+        'Rendez-vous de suivi réguliers',
       ],
       'isPopular': false,
     },
@@ -181,9 +184,9 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
   }
 
   Future<void> _finaliserSauvegarde(
-    Map<String, dynamic> donnees, {
-    required bool formuleActivee,
-  }) async {
+      Map<String, dynamic> donnees, {
+        required bool formuleActivee,
+      }) async {
     if (formuleActivee) {
       await _apiService.clearPendingRegistration();
       return;
@@ -243,8 +246,8 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         const SnackBar(
           content: Text(
             'Toujours impossible de créer le compte. '
-            'Réessayez plus tard ou contactez le support '
-            'avec la référence de transaction.',
+                'Réessayez plus tard ou contactez le support '
+                'avec la référence de transaction.',
           ),
           backgroundColor: Colors.red,
         ),
@@ -268,7 +271,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     debugPrint(
       '⚠️ activatePlan a échoué côté serveur alors que FedaPay '
-      'a confirmé le paiement (transaction_id: $transactionId).',
+          'a confirmé le paiement (transaction_id: $transactionId).',
     );
 
     AuthState.instance.isPro.value = true;
@@ -337,7 +340,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     if (widget.isOnboarding) {
       final parts =
-          (widget.nomComplet ?? '').trim().split(RegExp(r'\s+'));
+      (widget.nomComplet ?? '').trim().split(RegExp(r'\s+'));
 
       firstname = parts.isNotEmpty ? parts.first : (widget.nomComplet ?? '');
       lastname = parts.length > 1 ? parts.sublist(1).join(' ') : '';
@@ -489,6 +492,18 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     setState(() => _isLoading = false);
   }
 
+  /// Formate un montant en FCFA avec séparateur d'espace
+  /// (ex. 13750 -> "13 750 FCFA").
+  String _fcfa(num v) {
+    final s = v.round().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+      buf.write(s[i]);
+    }
+    return '$buf FCFA';
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_paiementEnAttenteDeCompte) {
@@ -542,7 +557,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                               plan: _plans[index],
                               isSelected: _selectedPlanIndex == index,
                               onTap: () => setState(
-                                () => _selectedPlanIndex = index,
+                                    () => _selectedPlanIndex = index,
                               ),
                             ),
                           ),
@@ -609,7 +624,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                     height: 52,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8B5CF6),
+                        backgroundColor: const Color(0xFF0D5C52),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -620,23 +635,23 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                           : () => _gererPaiement(selectedPlan),
                       child: _isLoading
                           ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            )
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      )
                           : Text(
-                              widget.isOnboarding
-                                  ? 'Créer mon compte (${selectedPlan['title']} — ${selectedPlan['price']})'
-                                  : 'Activer la formule ${selectedPlan['title']} (${selectedPlan['price']})',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                        widget.isOnboarding
+                            ? 'Créer mon compte (${selectedPlan['title']} — ${_fcfa(selectedPlan['amountFcfa'])})'
+                            : 'Activer la formule ${selectedPlan['title']} (${_fcfa(selectedPlan['amountFcfa'])})',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   if (widget.isOnboarding) ...[
@@ -699,8 +714,8 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
               const SizedBox(height: 16),
               const Text(
                 'Votre paiement a bien été confirmé, '
-                'mais la création de votre compte a échoué '
-                '(problème réseau ou serveur).',
+                    'mais la création de votre compte a échoué '
+                    '(problème réseau ou serveur).',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 15,
@@ -741,9 +756,9 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
               ],
               Text(
                 'Vos informations sont sauvegardées — '
-                'vous ne serez pas débité une seconde fois '
-                'en réessayant. Si le problème persiste, '
-                'contactez le support en donnant cette référence.',
+                    'vous ne serez pas débité une seconde fois '
+                    'en réessayant. Si le problème persiste, '
+                    'contactez le support en donnant cette référence.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -757,7 +772,7 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                 child: ElevatedButton(
                   onPressed: _isLoading ? null : _reessayerCreationCompte,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1565D8),
+                    backgroundColor: const Color(0xFF0D5C52),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -766,20 +781,20 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                   ),
                   child: _isLoading
                       ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2.5,
-                          ),
-                        )
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
                       : const Text(
-                          'Réessayer',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                    'Réessayer',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
             ],

@@ -50,6 +50,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/images/avatar_neutre.jpeg
 
   # Police de la charte graphique (Poppins)
   fonts:
