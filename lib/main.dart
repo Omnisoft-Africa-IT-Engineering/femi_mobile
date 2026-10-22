@@ -44,7 +44,7 @@ class FemiApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Femi',
+      title: 'Femi by Omnisoft Africa',
       // Thème unique de la charte graphique Femi (couleurs, police Poppins, arrondis)
       theme: AppTheme.light,
       home: const AuthGate(),
