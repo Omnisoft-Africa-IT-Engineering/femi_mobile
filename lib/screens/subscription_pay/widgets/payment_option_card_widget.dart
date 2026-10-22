@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+const Color _vert = Color(0xFF0D5C52);
+const Color _vertClair = Color(0xFFEAF6F3);
+
 class PaymentOptionCardWidget extends StatelessWidget {
   final int index;
   final int groupValue;
@@ -31,7 +34,7 @@ class PaymentOptionCardWidget extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey.shade200,
+            color: isSelected ? _vert : Colors.grey.shade200,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -40,10 +43,10 @@ class PaymentOptionCardWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E8FF),
+                color: _vertClair,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: const Color(0xFF8B5CF6)),
+              child: Icon(icon, color: _vert),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -69,7 +72,7 @@ class PaymentOptionCardWidget extends StatelessWidget {
             Radio<int>(
               value: index,
               groupValue: groupValue,
-              activeColor: const Color(0xFF8B5CF6),
+              activeColor: _vert,
               onChanged: onChanged,
             ),
           ],

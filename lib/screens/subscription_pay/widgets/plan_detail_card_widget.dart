@@ -1,5 +1,18 @@
 import 'package:flutter/material.dart';
 
+const Color _vert = Color(0xFF0D5C52);
+const Color _vertClair = Color(0xFFEAF6F3);
+
+String _fcfa(num v) {
+  final s = v.round().toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+    buf.write(s[i]);
+  }
+  return '$buf FCFA';
+}
+
 class PlanDetailCardWidget extends StatelessWidget {
   final Map<String, dynamic> plan;
 
@@ -11,7 +24,8 @@ class PlanDetailCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = (plan['title'] as String?) ?? '';
-    final price = (plan['price'] as String?) ?? '';
+    final priceEuro = (plan['price'] as String?) ?? '';
+    final amountFcfa = (plan['amountFcfa'] as num?) ?? 0;
     final period = (plan['period'] as String?) ?? '';
     final description = (plan['description'] as String?) ?? '';
     final features = (plan['features'] as List<String>?) ?? [];
@@ -23,7 +37,7 @@ class PlanDetailCardWidget extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isPopular ? const Color(0xFF8B5CF6) : Colors.grey.shade200,
+          color: isPopular ? _vert : Colors.grey.shade200,
           width: isPopular ? 2 : 1,
         ),
         boxShadow: [
@@ -52,13 +66,13 @@ class PlanDetailCardWidget extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF3E8FF),
+                    color: _vertClair,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Text(
                     'LE PLUS CHOISI',
                     style: TextStyle(
-                      color: Color(0xFF8B5CF6),
+                      color: _vert,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -72,16 +86,23 @@ class PlanDetailCardWidget extends StatelessWidget {
             style: const TextStyle(fontSize: 13, color: Colors.black54, height: 1.3),
           ),
           const SizedBox(height: 16),
+          // Prix principal : FCFA
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                price,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _fcfa(amountFcfa),
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
@@ -91,35 +112,43 @@ class PlanDetailCardWidget extends StatelessWidget {
               ),
             ],
           ),
+          // Prix secondaire : euro
+          if (priceEuro.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              '≈ $priceEuro $period',
+              style: const TextStyle(fontSize: 13, color: Colors.black45),
+            ),
+          ],
           const Divider(height: 32),
 
           ...features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF8B5CF6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.check, size: 14, color: Colors.white),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
+            padding: const EdgeInsets.only(bottom: 12.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: _vert,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.check, size: 14, color: Colors.white),
                 ),
-              )),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    feature,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )),
         ],
       ),
     );

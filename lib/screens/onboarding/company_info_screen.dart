@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../subscription_pay/subscription_pay_screen.dart'; 
+import '../subscription_pay/subscription_pay_screen.dart';
 
 /// Étape 2 de l'onboarding — Informations sur l'entreprise.
 /// Ne crée plus le compte directement : redirige vers SubscriptionPayScreen,
@@ -30,17 +30,17 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
   final TextEditingController _telephoneController = TextEditingController();
 
   String? _secteurActivite;
-  String _typeActivite = 'Achat-Vente';
   String _formeJuridique = 'Entreprise individuelle';
   String _devise = 'FCFA';
 
   static const Color _bgColor = Color(0xFFF7F9FC);
-  static const Color _primaryBlue = Color(0xFF1565D8);
+  static const Color _primaryColor = Color(0xFF0D5C52);
 
   final List<String> _secteurs = const [
     'Commerce général',
     'Services',
     'Industrie / Production',
+    'Finances personnelles',
     'Autre',
   ];
 
@@ -201,51 +201,6 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                 const SizedBox(height: 20),
 
                 const Text(
-                  "Type d'activité",
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF444444),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildChoiceChip(
-                        label: 'Achat-Vente',
-                        selected: _typeActivite == 'Achat-Vente',
-                        onTap: () => setState(() => _typeActivite = 'Achat-Vente'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildChoiceChip(
-                        label: 'Dépôt-Vente',
-                        selected: _typeActivite == 'Dépôt-Vente',
-                        onTap: () => setState(() => _typeActivite = 'Dépôt-Vente'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildChoiceChip(
-                        label: 'Personnel',
-                        selected: _typeActivite == 'Personnel',
-                        onTap: () => setState(() => _typeActivite = 'Personnel'),
-                      ),
-                    ),
-                  ],
-                ),
-                if (_typeActivite == 'Personnel') ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Idéal pour suivre vos propres dépenses, sans gestion d\'entreprise.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-                const SizedBox(height: 20),
-
-                const Text(
                   'Forme juridique',
                   style: TextStyle(
                     fontSize: 13,
@@ -355,7 +310,7 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
                   child: ElevatedButton(
                     onPressed: _continuerVersPaiement,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryBlue,
+                      backgroundColor: _primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -397,7 +352,7 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
             height: 4,
             margin: EdgeInsets.only(right: step < 3 ? 6 : 0),
             decoration: BoxDecoration(
-              color: active ? _primaryBlue : Colors.grey.shade300,
+              color: active ? _primaryColor : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -423,6 +378,7 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        cursorColor: _primaryColor,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
@@ -463,38 +419,11 @@ class _CompanyInfoScreenState extends State<CompanyInfoScreen> {
         ),
         items: items
             .map((item) => DropdownMenuItem(
-                  value: item,
-                  child: Text(item, style: const TextStyle(fontSize: 14)),
-                ))
+          value: item,
+          child: Text(item, style: const TextStyle(fontSize: 14)),
+        ))
             .toList(),
         onChanged: onChanged,
-      ),
-    );
-  }
-
-  Widget _buildChoiceChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
-        decoration: BoxDecoration(
-          color: selected ? _primaryBlue : Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? _primaryBlue : Colors.grey.shade300),
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
-            fontWeight: FontWeight.w600,
-            fontSize: 12.5,
-          ),
-        ),
       ),
     );
   }
