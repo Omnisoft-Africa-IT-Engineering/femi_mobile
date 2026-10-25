@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../../models/devis.dart';
+import '../../models/ligne_devis.dart';
 import '../../services/devis_service.dart';
 import 'devis_card.dart';
 
@@ -21,7 +22,7 @@ class _DevisDetailScreenState extends State<DevisDetailScreen> {
   final _service = DevisService.instance;
 
   late Devis _devis;
-  bool _modifie = false;
+  bool _chargementLignes = false;
   bool _chargementPdf = false;
   bool _chargementStatut = false;
 
@@ -71,6 +72,61 @@ class _DevisDetailScreenState extends State<DevisDetailScreen> {
         setState(() => _chargementStatut = false);
       }
     }
+  }
+
+  void _afficherMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  /// Enregistre une action sur les lignes côté serveur, puis remplace le
+  /// devis affiché par la version renvoyée (montants recalculés par l'API).
+  Future<void> _mettreAJourLignes(
+    Future<Devis> Function(Object devisId) action,
+  ) async {
+    if (_chargementLignes) return;
+
+    final id = _devis.id;
+    if (id == null) {
+      _afficherMessage('Devis sans identifiant.');
+      return;
+    }
+
+    setState(() => _chargementLignes = true);
+    try {
+      final misAJour = await action(id);
+      if (!mounted) return;
+      setState(() => _devis = misAJour);
+    } catch (e) {
+      debugPrint('Erreur ligne devis : $e');
+      _afficherMessage(e.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _chargementLignes = false);
+    }
+  }
+
+  Future<void> _ajouterLigne(LigneDevis ligne) =>
+      _mettreAJourLignes((id) => _service.ajouterLigne(id, ligne));
+
+  Future<void> _modifierLigne(int index, LigneDevis ligne) {
+    final ligneId = _devis.lignes[index].id;
+    if (ligneId == null) {
+      _afficherMessage('Ligne sans identifiant.');
+      return Future.value();
+    }
+    return _mettreAJourLignes(
+        (id) => _service.modifierLigne(id, ligneId, ligne));
+  }
+
+  Future<void> _supprimerLigne(int index) {
+    final ligneId = _devis.lignes[index].id;
+    if (ligneId == null) {
+      _afficherMessage('Ligne sans identifiant.');
+      return Future.value();
+    }
+    return _mettreAJourLignes((id) => _service.supprimerLigne(id, ligneId));
   }
 
   Future<void> _apercuPdf() async {
@@ -198,24 +254,16 @@ class _DevisDetailScreenState extends State<DevisDetailScreen> {
               children: [
                 DevisCard(
                   devis: _devis,
-                  onChanged: (d) {
-                    setState(() {
-                      _devis = d;
-                      _modifie = true;
-                    });
-                  },
-                  onApercuPdf: _chargementPdf ? null : _apercuPdf,
-                  onPartager: _chargementPdf ? null : _partagerPdf,
+                  onAjouterLigne: _ajouterLigne,
+                  onModifierLigne: _modifierLigne,
+                  onSupprimerLigne: _supprimerLigne,
+                  occupe: _chargementLignes,
+                  onApercuPdf:
+                      (_chargementPdf || _chargementLignes) ? null : _apercuPdf,
+                  onPartager: (_chargementPdf || _chargementLignes)
+                      ? null
+                      : _partagerPdf,
                 ),
-                if (_modifie)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: Text(
-                      'Modifications des lignes non enregistrées côté serveur. '
-                      'Le PDF reflète encore la version serveur.',
-                      style: TextStyle(color: Colors.orange),
-                    ),
-                  ),
               ],
             ),
           ),

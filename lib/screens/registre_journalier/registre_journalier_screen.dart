@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/excel_export_service.dart';
 import '../../services/femi_api_service.dart';
 import '../../services/pdf_export_service.dart';
 import 'widgets/exercice_selector_widget.dart';
@@ -322,6 +323,78 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
       ),
 
       ecritures: ecrituresPdf,
+    );
+  }
+
+  // ============================================================
+  // EXPORT EXCEL
+  // ============================================================
+
+  double _enDouble(dynamic v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0.0;
+
+  Future<void> _telechargerExcel(Map<String, dynamic> data) async {
+    final String devise = (data['devise'] as String?) ?? 'XOF';
+    final List<dynamic> brutes = (data['ecritures'] as List<dynamic>?) ?? [];
+
+    final ecritures = brutes.map<Map<String, dynamic>>((brute) {
+      final e = brute as Map<String, dynamic>;
+      final String type = (e['type'] ?? '').toString();
+      return {
+        'date': (e['date'] ?? '').toString(),
+        'heure': (e['heure'] ?? '').toString(),
+        'titre': (e['titre'] ?? '').toString(),
+        'categorie': (e['categorie'] ?? _libelleType(type)).toString(),
+        'type': _libelleType(type),
+        'montant': _enDouble(e['montant']).abs(),
+      };
+    }).toList();
+
+    try {
+      await ExcelExportService.exportRegistreJournalier(
+        dateLabel: _formatPlageDates(_periodeSelectionnee),
+        devise: devise,
+        totalRecettes: _enDouble(data['total_recettes']),
+        totalDepenses: _enDouble(data['total_depenses']),
+        ecritures: ecritures,
+      );
+    } catch (e) {
+      debugPrint('Erreur export Excel registre : $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Impossible de générer le fichier Excel."),
+        ),
+      );
+    }
+  }
+
+  Widget _boutonExport({
+    required String label,
+    required IconData icone,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      height: 52,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF006654),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        icon: Icon(icone, color: Colors.white),
+        label: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
     );
   }
 
@@ -654,51 +727,30 @@ class _RegistreJournalierScreenState extends State<RegistreJournalierScreen> {
                   const SizedBox(height: 24),
 
                   // ==================================================
-                  // BOUTON PDF
+                  // BOUTONS D'EXPORT : PDF et EXCEL
                   // ==================================================
 
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-
-                    child:
-                        ElevatedButton.icon(
-                      onPressed: chargement
-                          ? null
-                          : () =>
-                              _telechargerPdf(data),
-
-                      style:
-                          ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color(0xFF006654),
-
-                        shape:
-                            RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(
-                            12,
-                          ),
-                        ),
-
-                        elevation: 0,
-                      ),
-
-                      icon: const Icon(
-                        Icons.file_download_outlined,
-                        color: Colors.white,
-                      ),
-
-                      label: const Text(
-                        'Télécharger en PDF',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight:
-                              FontWeight.bold,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _boutonExport(
+                          label: 'PDF',
+                          icone: Icons.picture_as_pdf_outlined,
+                          onPressed:
+                              chargement ? null : () => _telechargerPdf(data),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _boutonExport(
+                          label: 'Excel',
+                          icone: Icons.table_chart_outlined,
+                          onPressed: chargement
+                              ? null
+                              : () => _telechargerExcel(data),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 24),
