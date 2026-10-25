@@ -14,11 +14,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "924074246865-5n7cjopge91jhsbet89gkqb7ene2crn0.apps.googleusercontent.com",
+          "client_id": "924074246865-57tvb8qbn7sm2jsr3pt50scb0678i88c.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.example.femi_mobile",
-            "certificate_hash": "e6e62fa7e9f7e25067e5617c3b2375156bf93c8d"
+            "certificate_hash": "144f787a4ec91632b4e457edfbb5bf3777aa181d"
           }
         },
         {

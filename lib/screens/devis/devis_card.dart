@@ -5,18 +5,27 @@ import '../../utils/devis_theme.dart';
 import '../../utils/format.dart';
 import '../../widgets/statut_badge.dart';
 
-/// Carte d'un devis : lignes éditables, total recalculé, boutons d'action.
-/// Le widget ne garde aucun état : il renvoie le devis modifié via [onChanged].
+/// Carte d'un devis : lignes éditables, total, boutons d'action.
+/// Le widget ne garde aucun état : chaque action sur une ligne est confiée à
+/// l'écran parent, qui l'enregistre sur le serveur puis met le devis à jour.
 class DevisCard extends StatelessWidget {
   final Devis devis;
-  final ValueChanged<Devis> onChanged;
+  final Future<void> Function(LigneDevis ligne) onAjouterLigne;
+  final Future<void> Function(int index, LigneDevis ligne) onModifierLigne;
+  final Future<void> Function(int index) onSupprimerLigne;
+
+  /// Vrai pendant un enregistrement : les actions sur les lignes sont bloquées.
+  final bool occupe;
   final VoidCallback? onApercuPdf;
   final VoidCallback? onPartager;
 
   const DevisCard({
     super.key,
     required this.devis,
-    required this.onChanged,
+    required this.onAjouterLigne,
+    required this.onModifierLigne,
+    required this.onSupprimerLigne,
+    this.occupe = false,
     this.onApercuPdf,
     this.onPartager,
   });
@@ -34,16 +43,6 @@ class DevisCard extends StatelessWidget {
 
   String _fmtQte(num q) =>
       q == q.roundToDouble() ? q.toInt().toString() : q.toString();
-
-  void _remplacerLigne(int index, LigneDevis ligne) {
-    final l = [...devis.lignes]..[index] = ligne;
-    onChanged(devis.copyWith(lignes: l));
-  }
-
-  void _supprimerLigne(int index) {
-    final l = [...devis.lignes]..removeAt(index);
-    onChanged(devis.copyWith(lignes: l));
-  }
 
   Future<void> _editer(BuildContext context, {int? index}) async {
     final existante = index != null ? devis.lignes[index] : null;
@@ -119,9 +118,9 @@ class DevisCard extends StatelessWidget {
       nombre(prix.text)!,
     );
     if (index == null) {
-      onChanged(devis.copyWith(lignes: [...devis.lignes, ligne]));
+      await onAjouterLigne(ligne);
     } else {
-      _remplacerLigne(index, ligne);
+      await onModifierLigne(index, ligne);
     }
   }
 
@@ -156,6 +155,7 @@ class DevisCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 24),
+            if (occupe) const LinearProgressIndicator(minHeight: 2),
 
             // Lignes
             if (devis.lignes.isEmpty)
@@ -165,7 +165,9 @@ class DevisCard extends StatelessWidget {
               ),
             for (var i = 0; i < devis.lignes.length; i++)
               InkWell(
-                onTap: _editable ? () => _editer(context, index: i) : null,
+                onTap: (_editable && !occupe)
+                    ? () => _editer(context, index: i)
+                    : null,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
@@ -191,7 +193,7 @@ class DevisCard extends StatelessWidget {
                         IconButton(
                           tooltip: 'Supprimer',
                           icon: const Icon(Icons.close, size: 18),
-                          onPressed: () => _supprimerLigne(i),
+                          onPressed: occupe ? null : () => onSupprimerLigne(i),
                         ),
                     ],
                   ),
@@ -202,7 +204,7 @@ class DevisCard extends StatelessWidget {
               Align(
                 alignment: Alignment.centerLeft,
                 child: TextButton.icon(
-                  onPressed: () => _editer(context),
+                  onPressed: occupe ? null : () => _editer(context),
                   icon: const Icon(Icons.add),
                   label: const Text('Ajouter une ligne'),
                   style: TextButton.styleFrom(foregroundColor: kEmeraude),

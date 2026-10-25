@@ -3,39 +3,48 @@ double toDouble(dynamic v) =>
     v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
 
 class LigneDevis {
+  /// Identifiant serveur (null pour une ligne pas encore enregistrée).
+  final int? id;
   final String designation;
   final double quantite;
   final double prixUnitaire;
 
   const LigneDevis({
+    this.id,
     required this.designation,
     required this.quantite,
     required this.prixUnitaire,
   });
 
-  /// Équivalent de `total_ligne` côté backend (recalculé localement).
+  /// Équivalent de `montant_total` côté backend (recalculé localement).
   double get totalLigne => quantite * prixUnitaire;
 
   LigneDevis copyWith({
+    int? id,
     String? designation,
     double? quantite,
     double? prixUnitaire,
   }) =>
       LigneDevis(
+        id: id ?? this.id,
         designation: designation ?? this.designation,
         quantite: quantite ?? this.quantite,
         prixUnitaire: prixUnitaire ?? this.prixUnitaire,
       );
 
+  /// Le backend nomme le champ `description` (on accepte aussi l'ancien
+  /// nom `designation`).
   factory LigneDevis.fromJson(Map<String, dynamic> json) => LigneDevis(
-    designation: json['designation'] as String? ?? '',
+    id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}'),
+    designation:
+        (json['description'] ?? json['designation'])?.toString() ?? '',
     quantite: toDouble(json['quantite']),
     prixUnitaire: toDouble(json['prix_unitaire']),
   );
 
-  /// `total_ligne` n'est pas envoyé : le backend le calcule.
+  /// Corps attendu par le backend ; `montant_total` n'est jamais envoyé.
   Map<String, dynamic> toJson() => {
-    'designation': designation,
+    'description': designation,
     'quantite': quantite,
     'prix_unitaire': prixUnitaire,
   };

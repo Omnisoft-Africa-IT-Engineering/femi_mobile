@@ -101,7 +101,9 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Échec de l'enregistrement. Réessayez.")),
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+        ),
       );
     }
   }

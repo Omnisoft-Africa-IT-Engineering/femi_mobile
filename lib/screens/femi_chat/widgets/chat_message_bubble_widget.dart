@@ -4,7 +4,10 @@ import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
+import '../../../models/devis.dart';
 import '../../../models/femi_agent_models.dart';
+import '../../../services/devis_service.dart';
+import '../../devis/devis_detail_screen.dart';
 
 class ChatMessageBubbleWidget extends StatefulWidget {
   final Map<String, dynamic> message;
@@ -31,6 +34,8 @@ class _ChatMessageBubbleWidgetState
 
   Duration _audioDuration = Duration.zero;
   Duration _audioPosition = Duration.zero;
+
+  bool _ouvertureDevis = false;
 
   @override
   void initState() {
@@ -276,6 +281,58 @@ class _ChatMessageBubbleWidgetState
     );
   }
 
+  // Référence de devis (ex. DEV-A1B2C3D4) présente dans une réponse de Femi.
+  static final RegExp _regReferenceDevis = RegExp(r'\bDEV-[A-Z0-9]{6,}\b');
+
+  String? _referenceDevis(String? text, bool isUser) {
+    if (isUser || text == null) return null;
+    return _regReferenceDevis.firstMatch(text)?.group(0);
+  }
+
+  Future<void> _ouvrirDevis(String reference) async {
+    if (_ouvertureDevis) return;
+    setState(() => _ouvertureDevis = true);
+
+    String? erreur;
+    try {
+      final liste = await DevisService.instance.listerDevis();
+      Devis? trouve;
+      for (final d in liste) {
+        if ((d.numeroDevis ?? '').toUpperCase() == reference.toUpperCase()) {
+          trouve = d;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (trouve == null) {
+        erreur = 'Devis introuvable.';
+      } else {
+        await Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (_) => DevisDetailScreen(devis: trouve!),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erreur ouverture devis : $e');
+      final message = e.toString();
+      erreur = message.contains('403')
+          ? "Les devis sont réservés à l'administrateur de l'entreprise."
+          : "Impossible d'ouvrir le devis. Vérifie la connexion et réessaie.";
+    } finally {
+      if (mounted) setState(() => _ouvertureDevis = false);
+    }
+
+    if (erreur != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(erreur)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUser =
@@ -413,6 +470,30 @@ class _ChatMessageBubbleWidgetState
                   height: 1.3,
                 ),
               ),
+
+            if (_referenceDevis(text, isUser) != null) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _ouvertureDevis
+                      ? null
+                      : () => _ouvrirDevis(_referenceDevis(text, isUser)!),
+                  icon: _ouvertureDevis
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.description_outlined, size: 18),
+                  label: Text('Ouvrir le devis ${_referenceDevis(text, isUser)}'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF006654),
+                    side: const BorderSide(color: Color(0xFF006654)),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 4),
 
