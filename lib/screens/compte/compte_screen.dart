@@ -12,6 +12,7 @@ import '../faq/faq_screen.dart'; // Import de la FAQ
 import '../../states/auth_state.dart';
 import '../echeances_fiscales/echeances_fiscales_screen.dart';
 import '../devis/devis_list_screen.dart';
+import '../stock/stock_screen.dart';
 import '../../models/team_models.dart';
 import '../settings/settings_screen.dart';
 
@@ -127,7 +128,15 @@ class _CompteScreenState extends State<CompteScreen> {
                     ),
                   );
                 },
-              ),              DocTile(
+              ),
+              // Stock : visible par tous ; les actions sensibles sont réservées au gérant
+              DocTile(
+                icon: Icons.inventory_2_outlined,
+                title: 'Stock',
+                isUserPro: isPro,
+                onTap: () => _ouvrirPageControle(const StockScreen(), false),
+              ),
+              DocTile(
                 icon: Icons.event_note_outlined,
                 title: 'Échéances fiscales',
                 isUserPro: isPro,
