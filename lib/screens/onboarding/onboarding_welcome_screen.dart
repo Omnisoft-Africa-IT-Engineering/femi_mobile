@@ -10,7 +10,7 @@ class OnboardingWelcomeScreen extends StatelessWidget {
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
-  static const Color _primaryBlue = Color(0xFF1565D8);
+
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +81,7 @@ class OnboardingWelcomeScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryBlue,
+                    backgroundColor: const Color(0xFF0D5C52),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
