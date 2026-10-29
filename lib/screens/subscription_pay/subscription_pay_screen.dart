@@ -106,17 +106,23 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
   /// Mot de passe technique pour les inscriptions Google (password null).
   String _motDePasseEffectif(Map<String, dynamic> donnees) {
     final raw = donnees['password'];
-    if (raw is String && raw.trim().isNotEmpty) {
+    if (raw is String && raw
+        .trim()
+        .isNotEmpty) {
       return raw.trim();
     }
     final email = (donnees['email'] ?? 'user').toString();
-    final ts = DateTime.now().millisecondsSinceEpoch;
+    final ts = DateTime
+        .now()
+        .millisecondsSinceEpoch;
     return 'Gg_${email.hashCode.abs()}_$ts!A1';
   }
 
   String _emailEffectif(Map<String, dynamic> donnees) {
     final raw = donnees['email'];
-    if (raw is String && raw.trim().isNotEmpty) {
+    if (raw is String && raw
+        .trim()
+        .isNotEmpty) {
       return raw.trim();
     }
     throw Exception('Email manquant pour créer le compte.');
@@ -124,7 +130,9 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
   String _nomEntrepriseEffectif(Map<String, dynamic> donnees) {
     final raw = donnees['nomEntreprise'];
-    if (raw is String && raw.trim().isNotEmpty) {
+    if (raw is String && raw
+        .trim()
+        .isNotEmpty) {
       return raw.trim();
     }
     return 'Mon entreprise';
@@ -183,10 +191,9 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
     return false;
   }
 
-  Future<void> _finaliserSauvegarde(
-      Map<String, dynamic> donnees, {
-        required bool formuleActivee,
-      }) async {
+  Future<void> _finaliserSauvegarde(Map<String, dynamic> donnees, {
+    required bool formuleActivee,
+  }) async {
     if (formuleActivee) {
       await _apiService.clearPendingRegistration();
       return;
@@ -381,10 +388,11 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
 
     final paiementReussi = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => PaymentWebViewScreen(
-          paymentUrl: result.paymentUrl!,
-          callbackUrlPrefix: FedaPayService.callbackUrlPrefix,
-        ),
+        builder: (_) =>
+            PaymentWebViewScreen(
+              paymentUrl: result.paymentUrl!,
+              callbackUrlPrefix: FedaPayService.callbackUrlPrefix,
+            ),
       ),
     );
 
@@ -519,7 +527,8 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close, color: Colors.black87),
-          onPressed: () => widget.isOnboarding
+          onPressed: () =>
+          widget.isOnboarding
               ? Navigator.pop(context)
               : Navigator.pop(context, false),
         ),
@@ -556,9 +565,10 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                             child: PlanTabWidget(
                               plan: _plans[index],
                               isSelected: _selectedPlanIndex == index,
-                              onTap: () => setState(
-                                    () => _selectedPlanIndex = index,
-                              ),
+                              onTap: () =>
+                                  setState(
+                                        () => _selectedPlanIndex = index,
+                                  ),
                             ),
                           ),
                         );
@@ -644,8 +654,10 @@ class _SubscriptionPayScreenState extends State<SubscriptionPayScreen> {
                       )
                           : Text(
                         widget.isOnboarding
-                            ? 'Créer mon compte (${selectedPlan['title']} — ${_fcfa(selectedPlan['amountFcfa'])})'
-                            : 'Activer la formule ${selectedPlan['title']} (${_fcfa(selectedPlan['amountFcfa'])})',
+                            ? 'Créer mon compte (${selectedPlan['title']} — ${_fcfa(
+                            selectedPlan['amountFcfa'])})'
+                            : 'Activer la formule ${selectedPlan['title']} (${_fcfa(
+                            selectedPlan['amountFcfa'])})',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
