@@ -218,4 +218,25 @@ class StockService {
     if (r.statusCode != 200) throw _erreur(r, 'Téléchargement du modèle impossible');
     return r.bodyBytes;
   }
+
+  /// POST /stock/ocr-preview/ : photo → champs proposés (aucune écriture serveur).
+  Future<Map<String, dynamic>> ocrPreview({
+    required List<int> octets,
+    String nomFichier = 'photo.jpg',
+  }) async {
+    final requete =
+        http.MultipartRequest('POST', Uri.parse('$_base/ocr-preview/'))
+          ..headers.addAll(await _headers(json: false))
+          ..files.add(
+            http.MultipartFile.fromBytes('image', octets, filename: nomFichier),
+          );
+    final r = await http.Response.fromStream(
+      await requete.send().timeout(const Duration(seconds: 90)),
+    );
+    if (r.statusCode != 200) {
+      throw _erreur(r, 'Lecture de la photo impossible');
+    }
+    return _objet(r);
+  }
+
 }

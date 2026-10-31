@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import '../stock/produit_form_sheet.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -564,6 +565,49 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     }
   }
 
+
+  /// Réponse backend ui_action=open_stock_form → ouvre le formulaire produit.
+  Future<void> _ouvrirFormulaireStockDepuisPreview(
+    Map<String, dynamic> response,
+  ) async {
+    final preview = response['stock_preview'];
+    if (preview is! Map) return;
+
+    final formRaw = preview['form'];
+    if (formRaw is! Map) return;
+    final form = Map<String, dynamic>.from(formRaw);
+
+    final existantId = form['produit_existant_id']?.toString();
+    if (existantId != null && existantId.isNotEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Produit reconnu : ${form['nom'] ?? ''}. '
+            'Ouvre la fiche stock pour une entrée ou sortie.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    final ok = await showProduitFormSheet(
+      context,
+      initialFromOcr: form,
+    );
+    if (ok == true && mounted) {
+      setState(() {
+        _messages.add({
+          'text': 'Produit enregistré dans le stock.',
+          'isUser': false,
+          'time': _nowTimeString(),
+        });
+      });
+      _scrollToBottom();
+    }
+  }
+
   // ============================================================
   // ENVOI
   // ============================================================
@@ -626,6 +670,23 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       );
 
       final respTimeString = _nowTimeString();
+
+      // Photo stock → formulaire prérempli
+      if (response['ui_action'] == 'open_stock_form') {
+        final messageText = response['message']?.toString() ??
+            'Complète le formulaire stock.';
+        if (mounted) {
+          setState(() {
+            _messages.add({
+              'text': messageText,
+              'isUser': false,
+              'time': respTimeString,
+            });
+          });
+        }
+        await _ouvrirFormulaireStockDepuisPreview(response);
+        return;
+      }
 
       setState(() {
         final isTransaction = response['isTransaction'] == true ||

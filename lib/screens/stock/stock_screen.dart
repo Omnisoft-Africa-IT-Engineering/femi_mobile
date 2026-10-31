@@ -12,6 +12,7 @@ import '../../widgets/statut_stock_badge.dart';
 import 'import_produits_screen.dart';
 import 'produit_detail_screen.dart';
 import 'produit_form_sheet.dart';
+import 'stock_photo_helper.dart';
 
 class _DonneesStock {
   final ResumeStock resume;
@@ -82,6 +83,26 @@ class _StockScreenState extends State<StockScreen> {
     if (ok == true && mounted) _recharger();
   }
 
+  Future<void> _depuisPhoto() async {
+    final ligne = await capturerEtLireStock(context);
+    if (ligne == null || !mounted) return;
+    final existantId = ligne['produit_existant_id']?.toString();
+    if (existantId != null && existantId.isNotEmpty) {
+      // Produit déjà en base → l'utilisateur ira sur la fiche pour un mouvement
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Produit reconnu : ${ligne['nom'] ?? ''}. Ouvre la fiche pour une entrée/sortie.',
+          ),
+        ),
+      );
+      await _charger();
+      return;
+    }
+    final ok = await showProduitFormSheet(context, initialFromOcr: ligne);
+    if (ok == true && mounted) _recharger();
+  }
+
   Future<void> _importer() async {
     await Navigator.push(
       context,
@@ -107,6 +128,7 @@ class _StockScreenState extends State<StockScreen> {
         actions: [
           PopupMenuButton<String>(
             onSelected: (v) {
+              if (v == 'photo') _depuisPhoto();
               if (v == 'import') _importer();
               if (v == 'archives') {
                 _archives = !_archives;
@@ -114,6 +136,11 @@ class _StockScreenState extends State<StockScreen> {
               }
             },
             itemBuilder: (_) => [
+              if (!_estEmploye)
+                const PopupMenuItem(
+                  value: 'photo',
+                  child: Text('Ajouter via photo'),
+                ),
               if (!_estEmploye)
                 const PopupMenuItem(
                   value: 'import',
