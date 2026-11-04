@@ -2,16 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../models/produit.dart';
 import '../../services/stock_service.dart';
-import 'stock_photo_helper.dart';
 import '../../theme/app_colors.dart';
 
 /// Fiche de création / modification d'un produit.
 /// Renvoie `true` si le produit a été enregistré.
-Future<bool?> showProduitFormSheet(
-  BuildContext context, {
-  Produit? produit,
-  Map<String, dynamic>? initialFromOcr,
-}) {
+Future<bool?> showProduitFormSheet(BuildContext context, {Produit? produit}) {
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -19,14 +14,13 @@ Future<bool?> showProduitFormSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => _ProduitForm(produit: produit, initialFromOcr: initialFromOcr),
+    builder: (_) => _ProduitForm(produit: produit),
   );
 }
 
 class _ProduitForm extends StatefulWidget {
   final Produit? produit;
-  final Map<String, dynamic>? initialFromOcr;
-  const _ProduitForm({this.produit, this.initialFromOcr});
+  const _ProduitForm({this.produit});
 
   @override
   State<_ProduitForm> createState() => _ProduitFormState();
@@ -52,32 +46,16 @@ class _ProduitFormState extends State<_ProduitForm> {
   void initState() {
     super.initState();
     final p = widget.produit;
-    final ocr = widget.initialFromOcr;
-    String _ocrStr(String k) {
-      final v = ocr?[k];
-      if (v == null) return '';
-      if (v is num) {
-        final d = v.toDouble();
-        return d == d.roundToDouble() ? d.round().toString() : d.toString();
-      }
-      return v.toString();
-    }
-    _nom = TextEditingController(text: p?.nom ?? _ocrStr('nom'));
-    _unite = TextEditingController(
-        text: p?.unite ?? (_ocrStr('unite').isEmpty ? 'pièce' : _ocrStr('unite')));
+    _nom = TextEditingController(text: p?.nom ?? '');
+    _unite = TextEditingController(text: p?.unite ?? 'pièce');
     _prixVente = TextEditingController(
-        text: p == null || p.prixVente == 0
-            ? _ocrStr('prix_vente')
-            : _texte(p.prixVente));
+        text: p == null || p.prixVente == 0 ? '' : _texte(p.prixVente));
     _seuil = TextEditingController(
-        text: p == null || p.seuilAlerte == 0 ? '' : _texte(p.seuilAlerte));
-    _sku = TextEditingController(text: p?.sku ?? _ocrStr('sku'));
-    if (p == null) {
-      final q = _ocrStr('quantite');
-      final c = _ocrStr('cout_unitaire');
-      if (q.isNotEmpty) _stockInitial.text = q;
-      if (c.isNotEmpty) _coutInitial.text = c;
-    }
+        // Nouveau produit : seuil prérempli à 5 (modifiable ; 0 = pas d'alerte).
+        text: p == null
+            ? '5'
+            : (p.seuilAlerte == 0 ? '' : _texte(p.seuilAlerte)));
+    _sku = TextEditingController(text: p?.sku ?? '');
   }
 
   @override
@@ -105,33 +83,7 @@ class _ProduitFormState extends State<_ProduitForm> {
     return null;
   }
 
-  Future<void> _remplirDepuisPhoto() async {
-    final ligne = await capturerEtLireStock(context);
-    if (ligne == null || !mounted) return;
-    setState(() {
-      if ((ligne['nom'] ?? '').toString().isNotEmpty) {
-        _nom.text = ligne['nom'].toString();
-      }
-      if ((ligne['unite'] ?? '').toString().isNotEmpty) {
-        _unite.text = ligne['unite'].toString();
-      }
-      if (ligne['prix_vente'] != null) {
-        _prixVente.text = ligne['prix_vente'].toString();
-      }
-      if ((ligne['sku'] ?? '').toString().isNotEmpty) {
-        _sku.text = ligne['sku'].toString();
-      }
-      if (ligne['quantite'] != null) {
-        _stockInitial.text = ligne['quantite'].toString();
-      }
-      if (ligne['cout_unitaire'] != null) {
-        _coutInitial.text = ligne['cout_unitaire'].toString();
-      }
-    });
-  }
-
   Future<void> _enregistrer() async {
-
     if (!_formKey.currentState!.validate()) return;
     setState(() => _enCours = true);
     try {
@@ -181,8 +133,6 @@ class _ProduitFormState extends State<_ProduitForm> {
           20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
       child: SingleChildScrollView(
         child: Form(
-            // Photo → préremplir (création uniquement)
-
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -228,7 +178,7 @@ class _ProduitFormState extends State<_ProduitForm> {
                     child: TextFormField(
                       controller: _seuil,
                       keyboardType: nombre,
-                      decoration: _deco("Seuil d'alerte", aide: 'Alerte à ce niveau'),
+                      decoration: _deco("Seuil d'alerte", aide: 'Prévenu à ce niveau'),
                       validator: _validerNombre,
                     ),
                   ),

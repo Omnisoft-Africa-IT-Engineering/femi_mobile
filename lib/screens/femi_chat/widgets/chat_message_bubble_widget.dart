@@ -8,6 +8,7 @@ import '../../../models/devis.dart';
 import '../../../models/femi_agent_models.dart';
 import '../../../services/devis_service.dart';
 import '../../../utils/html_text.dart';
+import 'formatted_message_text.dart';
 import '../../devis/devis_detail_screen.dart';
 
 class ChatMessageBubbleWidget extends StatefulWidget {
@@ -462,16 +463,23 @@ class _ChatMessageBubbleWidgetState
             // -------------------------------------------------
 
             if (text != null && text.isNotEmpty)
-              Text(
-                text,
-                style: TextStyle(
-                  color: isUser
-                      ? Colors.white
-                      : Colors.black87,
-                  fontSize: 15,
-                  height: 1.3,
-                ),
-              ),
+              isUser
+                  ? Text(
+                      text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        height: 1.3,
+                      ),
+                    )
+                  : FormattedMessageText(
+                      text: text,
+                      style: const TextStyle(
+                        color: Colors.black87,
+                        fontSize: 15,
+                        height: 1.3,
+                      ),
+                    ),
 
             if (_referenceDevis(text, isUser) != null) ...[
               const SizedBox(height: 8),

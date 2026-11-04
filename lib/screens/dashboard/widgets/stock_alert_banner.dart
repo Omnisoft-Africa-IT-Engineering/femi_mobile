@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/produit.dart';
 import '../../../services/stock_service.dart';
+import '../../../theme/app_colors.dart';
 import '../../../utils/format.dart';
 import '../../stock/stock_screen.dart';
 
@@ -11,10 +12,14 @@ class AlertesStock {
   final int nbAlertes;
   final List<Produit> produits; // les plus urgents, 3 au maximum
 
+  /// Produits actifs sans seuil d'alerte (donc jamais surveillés).
+  final int sansSeuil;
+
   const AlertesStock({
     required this.nbRuptures,
     required this.nbAlertes,
     required this.produits,
+    this.sansSeuil = 0,
   });
 
   bool get aSurveiller => nbRuptures + nbAlertes > 0;
@@ -26,7 +31,19 @@ class AlertesStock {
       final service = StockService.instance;
       final ResumeStock resume = await service.resume();
       if (resume.nbRuptures + resume.nbAlertes == 0) {
-        return const AlertesStock(nbRuptures: 0, nbAlertes: 0, produits: []);
+        // Rien à signaler : on regarde si des produits ne sont pas surveillés
+        // (seuil d'alerte à 0), car sans seuil aucune alerte ne peut se produire.
+        int sansSeuil = 0;
+        if (resume.nombreProduits > 0) {
+          final tous = await service.listerProduits();
+          sansSeuil = tous.where((p) => p.seuilAlerte <= 0).length;
+        }
+        return AlertesStock(
+          nbRuptures: 0,
+          nbAlertes: 0,
+          produits: const [],
+          sansSeuil: sansSeuil,
+        );
       }
 
       final listes = await Future.wait([
@@ -60,14 +77,60 @@ class StockAlertBanner extends StatelessWidget {
     this.onRetourStock,
   });
 
+  /// Aucun produit en alerte, mais des produits sans seuil : on guide l'utilisateur.
+  Widget _buildAideSeuil(BuildContext context, int nombre) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Material(
+        color: AppColors.vertClair,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const StockScreen()),
+            );
+            onRetourStock?.call();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications_active_outlined,
+                    color: AppColors.vert, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    nombre == 1
+                        ? "1 produit n'a pas de seuil d'alerte. Définis-en un pour être prévenu avant la rupture."
+                        : "$nombre produits n'ont pas de seuil d'alerte. Définis-en un pour être prévenu avant la rupture.",
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      color: AppColors.vert,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.vert),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<AlertesStock?>(
       future: future,
       builder: (context, snapshot) {
         final AlertesStock? alertes = snapshot.data;
-        if (alertes == null || !alertes.aSurveiller) {
-          return const SizedBox.shrink();
+        if (alertes == null) return const SizedBox.shrink();
+        if (!alertes.aSurveiller) {
+          return alertes.sansSeuil > 0
+              ? _buildAideSeuil(context, alertes.sansSeuil)
+              : const SizedBox.shrink();
         }
 
         final bool rupture = alertes.nbRuptures > 0;
