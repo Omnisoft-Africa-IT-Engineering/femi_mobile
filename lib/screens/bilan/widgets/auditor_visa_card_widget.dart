@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class AuditorVisaCardWidget extends StatelessWidget {
   const AuditorVisaCardWidget({super.key});
 
@@ -28,7 +29,7 @@ class AuditorVisaCardWidget extends StatelessWidget {
               children: [
                 Text('Cabinet Conseil & Audit ONEC...', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                 Text('Rapport de commissariat sans réserve', style: TextStyle(color: Colors.grey, fontSize: 10)),
-                Text('Visa N° CI-2023-9942', style: TextStyle(color: Color(0xFF005AC1), fontSize: 9, fontWeight: FontWeight.bold)),
+                Text('Visa N° CI-2023-9942', style: TextStyle(color: AppColors.vert, fontSize: 9, fontWeight: FontWeight.bold)),
               ],
             ),
           ),

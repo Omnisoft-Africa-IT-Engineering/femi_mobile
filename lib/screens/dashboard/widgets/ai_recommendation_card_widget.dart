@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class AiRecommendationCardWidget extends StatelessWidget {
   final String title;
   final String description;
@@ -35,7 +36,7 @@ class AiRecommendationCardWidget extends StatelessWidget {
               const Icon(
                 Icons.lightbulb_outline,
                 size: 20,
-                color: Color(0xFF1B75BC),
+                color: AppColors.vert,
               ),
               const SizedBox(width: 8),
               Text(
@@ -60,7 +61,7 @@ class AiRecommendationCardWidget extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onPrimaryPressed ?? () {},
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1B75BC),
+                    backgroundColor: AppColors.vert,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(

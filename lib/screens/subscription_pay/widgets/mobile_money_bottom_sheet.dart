@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 // 1. BOTTOM SHEET POUR LA SAISIE DU NUMÉRO MOBILE MONEY
 class MobileMoneyBottomSheet extends StatefulWidget {
   final String initialPhoneNumber;
@@ -114,7 +115,7 @@ class _MobileMoneyBottomSheetState extends State<MobileMoneyBottomSheet> {
                 'Montant à débiter : ${widget.amount.toStringAsFixed(0)} ${widget.currency}',
                 style: const TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF2563EB),
+                  color: AppColors.vert,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -140,11 +141,11 @@ class _MobileMoneyBottomSheetState extends State<MobileMoneyBottomSheet> {
                     selectedColor: const Color(0xFFEFF6FF),
                     backgroundColor: const Color(0xFFF8FAFC),
                     labelStyle: TextStyle(
-                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      color: isSelected ? AppColors.vert : const Color(0xFF64748B),
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                     side: BorderSide(
-                      color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                      color: isSelected ? AppColors.vert : const Color(0xFFE2E8F0),
                     ),
                     onSelected: (bool selected) {
                       if (selected) {
@@ -191,7 +192,7 @@ class _MobileMoneyBottomSheetState extends State<MobileMoneyBottomSheet> {
                     widget.onConfirmPayment(phone, _selectedProvider);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: AppColors.vert,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -232,7 +233,7 @@ class USSDWaitingDialog {
               height: 50,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.vert),
               ),
             ),
             const SizedBox(height: 20),
@@ -256,11 +257,11 @@ class USSDWaitingDialog {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.lock_clock, size: 16, color: Color(0xFF2563EB)),
+                  Icon(Icons.lock_clock, size: 16, color: AppColors.vert),
                   SizedBox(width: 6),
                   Text(
                     'En attente du PIN...',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
+                    style: TextStyle(fontSize: 12, color: AppColors.vert, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),

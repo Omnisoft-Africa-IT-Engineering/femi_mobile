@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 /// Une ligne de compte pour un tableau de balance comptable.
 class BalanceRowData {
   final String numero;
@@ -166,7 +167,7 @@ class BalanceAccountTable extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: row.soldeDebiteur
-                        ? const Color(0xFF1B75BC)
+                        ? AppColors.vert
                         : const Color(0xFFB91C1C),
                   ),
                 ),

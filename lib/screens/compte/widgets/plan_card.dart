@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class PlanCard extends StatelessWidget {
   final bool isPro;
   final VoidCallback onUpgradePressed;
@@ -18,7 +19,7 @@ class PlanCard extends StatelessWidget {
         gradient: LinearGradient(
           colors: isPro
               ? [const Color(0xFF0D9488), const Color(0xFF059669)]
-              : [const Color(0xFF1B75BC), const Color(0xFF0D47A1)],
+              : [AppColors.vert, AppColors.nuit],
         ),
         borderRadius: BorderRadius.circular(16),
       ),

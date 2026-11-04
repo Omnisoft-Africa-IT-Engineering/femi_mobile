@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class FaqContactCard extends StatelessWidget {
   final VoidCallback? onPressed;
 
@@ -50,7 +51,7 @@ class FaqContactCard extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: AppColors.vert,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(

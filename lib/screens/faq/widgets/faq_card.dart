@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class FaqCard extends StatelessWidget {
   final String number;
   final String question;
@@ -43,7 +44,7 @@ class FaqCard extends StatelessWidget {
               child: Text(
                 number,
                 style: const TextStyle(
-                  color: Color(0xFF2563EB),
+                  color: AppColors.vert,
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),

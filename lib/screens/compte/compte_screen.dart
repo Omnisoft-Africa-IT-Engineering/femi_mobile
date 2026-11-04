@@ -20,6 +20,7 @@ import '../settings/settings_screen.dart';
 import 'widgets/plan_card.dart';
 import 'widgets/doc_title.dart';
 
+import '../../theme/app_colors.dart';
 class CompteScreen extends StatefulWidget {
   const CompteScreen({super.key});
 
@@ -187,7 +188,7 @@ class _CompteScreenState extends State<CompteScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 child: ListTile(
                   leading: const CircleAvatar(
-                    backgroundColor: Color(0xFF1B75BC),
+                    backgroundColor: AppColors.vert,
                     child: Icon(Icons.support_agent, color: Colors.white),
                   ),
                   title: const Text(
@@ -198,7 +199,7 @@ class _CompteScreenState extends State<CompteScreen> {
                     'Échangez 30 min avec un consultant Femi pour faire le point sur votre gestion.',
                     style: TextStyle(fontSize: 12),
                   ),
-                  trailing: const Icon(Icons.chevron_right, color: Color(0xFF1B75BC)),
+                  trailing: const Icon(Icons.chevron_right, color: AppColors.vert),
                   onTap: () {
                     Navigator.push(
                       context,
@@ -291,7 +292,7 @@ class _CompteScreenState extends State<CompteScreen> {
             child: const Text('Annuler'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565D8)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.vert),
             onPressed: () async {
               Navigator.pop(dialogContext);
               await AuthState.instance.logout();

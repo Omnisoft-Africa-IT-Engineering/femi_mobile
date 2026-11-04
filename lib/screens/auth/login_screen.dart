@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
-  static const Color _primaryBlue = Color(0xFF1565D8);
+
 
   @override
   void dispose() {
@@ -37,11 +37,13 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       String? fcmToken = await FirebaseMessaging.instance.getToken();
       if (fcmToken != null) {
-        String plateforme = defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
+        String plateforme =
+        defaultTargetPlatform == TargetPlatform.iOS ? 'IOS' : 'ANDROID';
         await FemiApiService().enregistrerAppareil(fcmToken, plateforme);
       }
     } catch (e) {
-      debugPrint("Erreur lors de l'enregistrement de l'appareil FCM après login : $e");
+      debugPrint(
+          "Erreur lors de l'enregistrement de l'appareil FCM après login : $e");
     }
   }
 
@@ -83,80 +85,71 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-Future<void> _handleGoogleLogin() async {
-  final result = await AuthState.instance.loginWithGoogle();
+  Future<void> _handleGoogleLogin() async {
+    final result = await AuthState.instance.loginWithGoogle();
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  // Annulé ou erreur
-  if (result['success'] != true) {
-    final msg = AuthState.instance.errorMessage.value;
-    if (msg != null && msg.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-    return;
-  }
-
-  // Nouvel utilisateur → infos entreprise
-  if (result['is_new_user'] == true) {
-    final googleData = result['google_data'];
-    final map = googleData is Map
-        ? Map<String, dynamic>.from(googleData)
-        : <String, dynamic>{};
-
-    final email = (map['email'] ?? '').toString().trim();
-    final fullName = (map['full_name'] ?? map['name'] ?? '').toString().trim();
-
-    if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Impossible de récupérer votre adresse email Google.',
+    // Annulé ou erreur
+    if (result['success'] != true) {
+      final msg = AuthState.instance.errorMessage.value;
+      if (msg != null && msg.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: Colors.red,
           ),
-          backgroundColor: Colors.red,
+        );
+      }
+      return;
+    }
+
+    // Nouvel utilisateur → infos entreprise
+    if (result['is_new_user'] == true) {
+      final googleData = result['google_data'];
+      final map = googleData is Map
+          ? Map<String, dynamic>.from(googleData)
+          : <String, dynamic>{};
+
+      final email = (map['email'] ?? '').toString().trim();
+      final fullName =
+      (map['full_name'] ?? map['name'] ?? '').toString().trim();
+
+      if (email.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Impossible de récupérer votre adresse email Google.',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      final nomEntrepriseInitial =
+      fullName.isNotEmpty ? fullName : 'Mon entreprise';
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CompanyInfoScreen(
+            nomComplet: fullName,
+            nomEntrepriseInitial: nomEntrepriseInitial,
+            email: email,
+            password: null, // inscription Google
+          ),
         ),
       );
       return;
     }
 
-    final nomEntrepriseInitial =
-        fullName.isNotEmpty ? fullName : 'Mon entreprise';
+    // Utilisateur déjà connu
+    await _registerFcmDevice();
+    if (!mounted) return;
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CompanyInfoScreen(
-          nomComplet: fullName,
-          nomEntrepriseInitial: nomEntrepriseInitial,
-          email: email,
-          password: null, // inscription Google
-        ),
-      ),
-    );
-    return;
-  }
-
-  // Utilisateur déjà connu
-  await _registerFcmDevice();
-  if (!mounted) return;
-
-  if (Navigator.of(context).canPop()) {
-    Navigator.of(context).pop();
-  }
-}
-  void _handleSocialLogin(String provider) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Connexion avec $provider en cours...'),
-        backgroundColor: _primaryBlue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
-    // TODO: Telegram / Apple plus tard
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   /// Ouvre l'écran d'activation. S'il réussit, il renvoie l'e-mail et le mot
@@ -300,7 +293,7 @@ Future<void> _handleGoogleLogin() async {
                       child: ElevatedButton(
                         onPressed: isLoading ? null : _handleLogin,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _primaryBlue,
+                          backgroundColor: _darkGreen,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
@@ -309,20 +302,20 @@ Future<void> _handleGoogleLogin() async {
                         ),
                         child: isLoading
                             ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2.5,
-                                ),
-                              )
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
                             : const Text(
-                                'Se connecter',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                          'Se connecter',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -345,41 +338,16 @@ Future<void> _handleGoogleLogin() async {
                 ),
                 const SizedBox(height: 20),
 
-                // --- SECTION BOUTONS SOCIAUX ---
+                // --- SECTION BOUTON GOOGLE ---
                 ValueListenableBuilder<bool>(
                   valueListenable: AuthState.instance.isLoading,
                   builder: (context, isLoading, _) {
                     return Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Google (fonctionnel)
                         _buildSocialButton(
-                          label: 'Google',
-                          icon: Icons.g_mobiledata_rounded,
-                          iconColor: const Color(0xFFEA4335),
+                          label: 'Continuer avec Google',
+                          logoAsset: 'assets/images/google_g_logo.png',
                           onPressed: isLoading ? null : _handleGoogleLogin,
-                        ),
-                        const SizedBox(width: 14),
-
-                        // Telegram (placeholder)
-                        _buildSocialButton(
-                          label: 'Telegram',
-                          icon: Icons.send_rounded,
-                          iconColor: const Color(0xFF0088CC),
-                          onPressed: isLoading
-                              ? null
-                              : () => _handleSocialLogin('Telegram'),
-                        ),
-                        const SizedBox(width: 14),
-
-                        // Apple (placeholder)
-                        _buildSocialButton(
-                          label: 'Apple',
-                          icon: Icons.apple_rounded,
-                          iconColor: Colors.black,
-                          onPressed: isLoading
-                              ? null
-                              : () => _handleSocialLogin('Apple'),
                         ),
                       ],
                     );
@@ -430,7 +398,6 @@ Future<void> _handleGoogleLogin() async {
                   ),
                 ),
                 const SizedBox(height: 32),
-
               ],
             ),
           ),
@@ -466,7 +433,7 @@ Future<void> _handleGoogleLogin() async {
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding:
-              const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+          const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
         ),
       ),
     );
@@ -474,8 +441,7 @@ Future<void> _handleGoogleLogin() async {
 
   Widget _buildSocialButton({
     required String label,
-    required IconData icon,
-    required Color iconColor,
+    required String logoAsset,
     required VoidCallback? onPressed,
   }) {
     return Expanded(
@@ -499,12 +465,12 @@ Future<void> _handleGoogleLogin() async {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: iconColor, size: 24),
-              const SizedBox(width: 6),
+              Image.asset(logoAsset, width: 22, height: 22),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF334155),
                 ),

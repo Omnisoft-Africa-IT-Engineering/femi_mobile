@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class CompanyStatusCardWidget extends StatelessWidget {
   final String companyName;
   final String ccNumber;
@@ -56,7 +57,7 @@ class CompanyStatusCardWidget extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFF005AC1),
+                color: AppColors.vert,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Row(

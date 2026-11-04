@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../models/devis.dart';
 import '../../../models/femi_agent_models.dart';
 import '../../../services/devis_service.dart';
+import '../../../utils/html_text.dart';
 import '../../devis/devis_detail_screen.dart';
 
 class ChatMessageBubbleWidget extends StatefulWidget {
@@ -338,8 +339,9 @@ class _ChatMessageBubbleWidgetState
     final isUser =
         (widget.message['isUser'] as bool?) ?? false;
 
-    final text =
+    final rawText =
         widget.message['text'] as String?;
+    final text = rawText == null ? null : decoderEntitesHtml(rawText);
 
     final time =
         (widget.message['time'] as String?) ?? '';

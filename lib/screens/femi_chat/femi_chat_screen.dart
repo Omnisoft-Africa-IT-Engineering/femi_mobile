@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import '../stock/produit_form_sheet.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
@@ -13,7 +12,9 @@ import '../../services/femi_agent_service.dart';
 import '../../services/femi_api_service.dart';
 import 'widgets/continuer_sur_whatsapp_banner.dart';
 import 'widgets/chat_date_badge_widget.dart';
+import 'widgets/attachment_preview_screen.dart';
 import 'widgets/chat_input_bar_widget.dart';
+import 'widgets/chat_suggestions_widget.dart';
 import 'widgets/chat_message_bubble_widget.dart';
 import 'widgets/chat_history_drawer_widget.dart';
 
@@ -357,6 +358,33 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
   // IMAGE / PDF
   // ============================================================
 
+  /// Aperçu plein écran (légende + bouton d'envoi, comme WhatsApp), puis
+  /// envoi. Si l'utilisateur annule, rien n'est envoyé ni conservé.
+  Future<void> _previewThenSend({File? image, File? pdf}) async {
+    final File? file = image ?? pdf;
+    if (file == null) return;
+
+    final String? caption = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => AttachmentPreviewScreen(
+          file: file,
+          isPdf: pdf != null,
+          initialCaption: _messageController.text.trim(),
+        ),
+      ),
+    );
+
+    if (!mounted || caption == null) return;
+
+    setState(() {
+      _selectedImage = image;
+      _selectedPdf = pdf;
+    });
+    _messageController.text = caption;
+    await _sendMessage();
+  }
+
   Future<void> _handlePickImage(bool isCamera) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
@@ -365,7 +393,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       );
 
       if (pickedFile != null) {
-        setState(() => _selectedImage = File(pickedFile.path));
+        await _previewThenSend(image: File(pickedFile.path));
       }
     } catch (e) {
       if (mounted) {
@@ -388,7 +416,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
 
       final path = result?.files.single.path;
       if (path != null) {
-        setState(() => _selectedPdf = File(path));
+        await _previewThenSend(pdf: File(path));
       }
     } catch (e) {
       if (mounted) {
@@ -565,49 +593,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
     }
   }
 
-
-  /// Réponse backend ui_action=open_stock_form → ouvre le formulaire produit.
-  Future<void> _ouvrirFormulaireStockDepuisPreview(
-    Map<String, dynamic> response,
-  ) async {
-    final preview = response['stock_preview'];
-    if (preview is! Map) return;
-
-    final formRaw = preview['form'];
-    if (formRaw is! Map) return;
-    final form = Map<String, dynamic>.from(formRaw);
-
-    final existantId = form['produit_existant_id']?.toString();
-    if (existantId != null && existantId.isNotEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Produit reconnu : ${form['nom'] ?? ''}. '
-            'Ouvre la fiche stock pour une entrée ou sortie.',
-          ),
-        ),
-      );
-      return;
-    }
-
-    if (!mounted) return;
-    final ok = await showProduitFormSheet(
-      context,
-      initialFromOcr: form,
-    );
-    if (ok == true && mounted) {
-      setState(() {
-        _messages.add({
-          'text': 'Produit enregistré dans le stock.',
-          'isUser': false,
-          'time': _nowTimeString(),
-        });
-      });
-      _scrollToBottom();
-    }
-  }
-
   // ============================================================
   // ENVOI
   // ============================================================
@@ -670,23 +655,6 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
       );
 
       final respTimeString = _nowTimeString();
-
-      // Photo stock → formulaire prérempli
-      if (response['ui_action'] == 'open_stock_form') {
-        final messageText = response['message']?.toString() ??
-            'Complète le formulaire stock.';
-        if (mounted) {
-          setState(() {
-            _messages.add({
-              'text': messageText,
-              'isUser': false,
-              'time': respTimeString,
-            });
-          });
-        }
-        await _ouvrirFormulaireStockDepuisPreview(response);
-        return;
-      }
 
       setState(() {
         final isTransaction = response['isTransaction'] == true ||
@@ -926,6 +894,17 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
           if (_selectedImage != null) _buildSelectedImagePreview(),
           if (_selectedPdf != null) _buildSelectedPdfPreview(),
           const ContinuerSurWhatsappBanner(),
+          ChatSuggestionsWidget(
+            controller: _messageController,
+            visible: !_isLoading &&
+                !_isRecording &&
+                _selectedImage == null &&
+                _selectedPdf == null,
+            onSelect: (question) {
+              _messageController.text = question;
+              _sendMessage();
+            },
+          ),
           ChatInputBarWidget(
             controller: _messageController,
             isRecording: _isRecording,
@@ -934,6 +913,7 @@ class _FemiChatScreenState extends State<FemiChatScreen> {
             onSend: () => _sendMessage(),
             onPickImage: _handlePickImage,
             onPickPdf: _handlePickPdf,
+            hasAttachment: _selectedImage != null || _selectedPdf != null,
             onStartRecording: _startRecording,
             onPauseRecording: _pauseRecording,
             onResumeRecording: _resumeRecording,

@@ -4,6 +4,7 @@ import '../../services/pdf_export_service.dart';
 import '../registre_journalier/widgets/exercice_selector_widget.dart';
 import 'widgets/balance_account_table.dart';
 
+import '../../theme/app_colors.dart';
 class BalanceGeneraleScreen extends StatefulWidget {
   const BalanceGeneraleScreen({super.key});
 
@@ -129,7 +130,7 @@ class _BalanceGeneraleScreenState extends State<BalanceGeneraleScreen> {
                     children: [
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1B75BC),
+                          backgroundColor: AppColors.vert,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class MetricCardWidget extends StatelessWidget {
   final String title;
   final String value;
@@ -7,17 +8,27 @@ class MetricCardWidget extends StatelessWidget {
   final Color color;
   final String? subtitle;
 
+  /// Emoji du catalogue KPI (ex. 💰). S'il est fourni, il remplace l'icône.
+  final String? emoji;
+
+  /// Couleur de la valeur (noir par défaut ; rouge pour un chiffre négatif).
+  final Color valueColor;
+
   const MetricCardWidget({
     super.key,
     required this.title,
     required this.value,
     this.icon = Icons.analytics_outlined,
-    this.color = Colors.blue,
+    this.color = AppColors.vert,
     this.subtitle,
+    this.emoji,
+    this.valueColor = Colors.black87,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bool aEmoji = emoji != null && emoji!.trim().isNotEmpty;
+
     return Container(
       width: 140,
       margin: const EdgeInsets.only(right: 12),
@@ -39,7 +50,10 @@ class MetricCardWidget extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, size: 16, color: color),
+              if (aEmoji)
+                Text(emoji!, style: const TextStyle(fontSize: 14))
+              else
+                Icon(icon, size: 16, color: color),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -57,10 +71,10 @@ class MetricCardWidget extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: Colors.black87,
+              color: valueColor,
             ),
             overflow: TextOverflow.ellipsis,
           ),

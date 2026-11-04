@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../../services/femi_api_service.dart';
+import '../../services/kpi_service.dart';
 import 'widgets/ai_recommendation_card_widget.dart';
 import 'widgets/ai_summary_card_widget.dart';
 import 'widgets/metric_card_widget.dart';
+import 'widgets/stock_alert_banner.dart';
 import '../femi_chat/widgets/femi_drawer_widget.dart';
 import '../notifications/notification_bell.dart';
 
+import '../../theme/app_colors.dart';
 class DashboardScreen extends StatefulWidget {
   /// Appelé quand l'utilisateur veut basculer vers l'agent Femi avec un
   /// message pré-rempli (ex. depuis la carte de recommandation IA).
@@ -27,7 +30,13 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final FemiApiService _apiService = FemiApiService();
+  final KpiService _kpiService = KpiService();
   late Future<Map<String, dynamic>?> _kpisFuture;
+  late Future<List<KpiNiveauResult>> _niveauxFuture;
+  late Future<AlertesStock?> _stockFuture;
+
+  // Niveaux affichés (les niveaux 4 et 5 n'ont pas encore de calcul).
+  static const List<int> _niveauxAffiches = [1, 2, 3];
 
   // Nom de l'entreprise du compte connecté, affiché dans l'AppBar.
   String _companyName = 'Femi';
@@ -41,6 +50,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _loadData() {
     _kpisFuture = _apiService.getDashboardKPIs(period: 'this_month');
+    _niveauxFuture =
+        _kpiService.getNiveaux(_niveauxAffiches, period: 'this_month');
+    _stockFuture = AlertesStock.charger();
   }
 
   Future<void> _loadCompanyName() async {
@@ -54,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _loadData();
     });
-    await _kpisFuture;
+    await Future.wait([_kpisFuture, _niveauxFuture, _stockFuture]);
   }
 
   String _formatCompactAmount(dynamic value, {String currency = 'FCFA'}) {
@@ -177,43 +189,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
             final Map<String, dynamic> kpis =
                 (responseData['kpis'] as Map<String, dynamic>?) ?? {};
-            final Map<String, dynamic> treasury =
-                (responseData['treasury'] as Map<String, dynamic>?) ?? {};
             final Map<String, dynamic> trends =
                 (responseData['trends'] as Map<String, dynamic>?) ?? {};
 
-            // --- NIVEAU 1 : Santé ---
+            final bool resumeDisponible = snapshot.data != null;
+
             final String revenue = _formatCompactAmount(kpis['total_revenue']);
-            final String netIncome = _formatCompactAmount(kpis['net_profit']);
             final String expenses = _formatCompactAmount(kpis['total_expenses']);
-            final String cashFlow = _formatCompactAmount(treasury['balance']);
-            final String activeClientsCount =
-                (kpis['unique_clients_count'] ?? 0).toString();
-            final String totalReceivables =
-                _formatCompactAmount(kpis['total_receivables']);
 
             final String revenueChange =
                 _formatTrend(trends['revenue_change_percentage']);
             final String expensesChange =
                 _formatTrend(trends['expenses_change_percentage']);
-            final String profitChange =
-                _formatTrend(trends['profit_change_percentage']);
 
-            // --- NIVEAU 2 : Activité ---
-            final String salesCount =
-                (kpis['total_transactions_count'] ?? 0).toString();
-            final String averageBasket =
-                _formatCompactAmount(kpis['average_sale_amount']);
-            final String pendingOrdersCount = '0';
-            final String totalProducts = '0';
-            final String recurringClientsCount = '0';
-            final String servicesCount = '0';
-
-            // --- NIVEAU 3 : Finance ---
             final double marginValue =
                 (kpis['profit_margin_percentage'] as num?)?.toDouble() ?? 0.0;
             final String marginRate = _formatPercentage(marginValue);
-            final String totalDebts = '0';
 
             final String contexte =
                 'Contexte : chiffre d\'affaires de $revenue ce mois-ci, '
@@ -228,12 +219,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AiSummaryCardWidget(
-                    message:
-                        'Chiffre d\'affaires : $revenue ce mois-ci ($revenueChange). '
-                        'Dépenses : $expenses ($expensesChange).',
+                  StockAlertBanner(
+                    future: _stockFuture,
+                    onRetourStock: _refreshData,
                   ),
-                  const SizedBox(height: 20),
+                  if (resumeDisponible) ...[
+                    AiSummaryCardWidget(
+                      message:
+                          'Chiffre d\'affaires : $revenue ce mois-ci ($revenueChange). '
+                          'Dépenses : $expenses ($expensesChange).',
+                    ),
+                    const SizedBox(height: 20),
+                  ],
 
                   const Text(
                     'Santé de l\'entreprise',
@@ -241,134 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  _buildLevelHeader('Niveau 1 — Santé'),
-                  _buildHorizontalScrollRow([
-                    MetricCardWidget(
-                      title: 'CHIFFRE D\'AFFAIRES',
-                      value: revenue,
-                      icon: Icons.payments,
-                      color: Colors.green,
-                      subtitle: revenueChange,
-                    ),
-                    MetricCardWidget(
-                      title: 'BÉNÉFICE NET',
-                      value: netIncome,
-                      icon: Icons.trending_up,
-                      color: Colors.green,
-                      subtitle: profitChange,
-                    ),
-                    MetricCardWidget(
-                      title: 'DÉPENSES',
-                      value: expenses,
-                      icon: Icons.shopping_bag,
-                      color: Colors.red,
-                      subtitle: expensesChange,
-                    ),
-                    MetricCardWidget(
-                      title: 'TRÉSORERIE',
-                      value: cashFlow,
-                      icon: Icons.account_balance,
-                      color: Colors.blue,
-                      subtitle: 'Disponible',
-                    ),
-                    MetricCardWidget(
-                      title: 'CLIENTS',
-                      value: activeClientsCount,
-                      icon: Icons.people,
-                      color: Colors.green,
-                      subtitle: 'Ce mois',
-                    ),
-                    MetricCardWidget(
-                      title: 'CRÉANCES',
-                      value: totalReceivables,
-                      icon: Icons.warning_amber_rounded,
-                      color: Colors.red,
-                      subtitle: 'À recouvrir',
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-
-                  _buildLevelHeader('Niveau 2 — Activité'),
-                  _buildHorizontalScrollRow([
-                    MetricCardWidget(
-                      title: 'TRANSACTIONS',
-                      value: salesCount,
-                      icon: Icons.point_of_sale,
-                      color: Colors.green,
-                      subtitle: 'Ce mois',
-                    ),
-                    MetricCardWidget(
-                      title: 'COMMANDES',
-                      value: pendingOrdersCount,
-                      icon: Icons.receipt_long,
-                      color: const Color(0xFF1B75BC),
-                    ),
-                    MetricCardWidget(
-                      title: 'PANIER MOYEN',
-                      value: averageBasket,
-                      icon: Icons.shopping_cart,
-                      color: Colors.green,
-                    ),
-                    MetricCardWidget(
-                      title: 'PRODUITS',
-                      value: totalProducts,
-                      icon: Icons.inventory_2,
-                      color: Colors.grey,
-                    ),
-                    MetricCardWidget(
-                      title: 'CLIENTS ACTIFS',
-                      value: recurringClientsCount,
-                      icon: Icons.person_pin,
-                      color: Colors.green,
-                    ),
-                    MetricCardWidget(
-                      title: 'PRESTATIONS',
-                      value: servicesCount,
-                      icon: Icons.build,
-                      color: const Color(0xFF1B75BC),
-                    ),
-                  ]),
-                  const SizedBox(height: 16),
-
-                  _buildLevelHeader('Niveau 3 — Finance'),
-                  _buildHorizontalScrollRow([
-                    MetricCardWidget(
-                      title: 'REVENUS',
-                      value: revenue,
-                      icon: Icons.attach_money,
-                      color: Colors.green,
-                    ),
-                    MetricCardWidget(
-                      title: 'DÉPENSES',
-                      value: expenses,
-                      icon: Icons.money_off,
-                      color: Colors.red,
-                    ),
-                    MetricCardWidget(
-                      title: 'MARGE',
-                      value: marginRate,
-                      icon: Icons.pie_chart,
-                      color: Colors.orange,
-                    ),
-                    MetricCardWidget(
-                      title: 'BÉNÉFICE',
-                      value: netIncome,
-                      icon: Icons.show_chart,
-                      color: Colors.green,
-                    ),
-                    MetricCardWidget(
-                      title: 'TRÉSORERIE',
-                      value: cashFlow,
-                      icon: Icons.account_balance_wallet,
-                      color: const Color(0xFF1B75BC),
-                    ),
-                    MetricCardWidget(
-                      title: 'DETTES',
-                      value: totalDebts,
-                      icon: Icons.credit_card_off,
-                      color: Colors.red,
-                    ),
-                  ]),
+                  _buildNiveaux(),
                   const SizedBox(height: 24),
 
                   // Pas de barre de saisie ici : les suggestions
@@ -420,6 +290,101 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  /// KPI par niveau, filtrés par secteur côté serveur (GET /kpi/<niveau>/).
+  Widget _buildNiveaux() {
+    return FutureBuilder<List<KpiNiveauResult>>(
+      future: _niveauxFuture,
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final List<KpiNiveauResult> niveaux = snap.data ?? [];
+        if (niveaux.isEmpty) {
+          return _buildNiveauErreur(
+            'Impossible de charger les indicateurs.',
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final niveau in niveaux) ...[
+              _buildLevelHeader('Niveau ${niveau.numero} — ${niveau.nom}'),
+              if (niveau.erreur != null)
+                _buildNiveauErreur(niveau.erreur!)
+              else if (niveau.kpis.isEmpty)
+                _buildNiveauErreur('Aucun indicateur pour ce niveau.')
+              else
+                _buildHorizontalScrollRow([
+                  for (final kpi in niveau.kpis) _buildKpiCard(kpi),
+                ]),
+              const SizedBox(height: 16),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildKpiCard(KpiItem kpi) {
+    final bool negatif = kpi.disponible &&
+        kpi.valeur is num &&
+        (kpi.valeur as num) < 0;
+
+    Color couleur = Colors.green;
+    if (!kpi.disponible) {
+      couleur = Colors.grey;
+    } else if (const {
+      'Dépenses',
+      'Dettes',
+      'Créances',
+      'Ruptures de stock',
+      'Alertes de stock',
+    }.contains(kpi.nom)) {
+      couleur = Colors.red;
+    } else if (kpi.nom == 'Trésorerie') {
+      couleur = AppColors.vert;
+    }
+
+    return MetricCardWidget(
+      title: kpi.nom.toUpperCase(),
+      value: kpi.valeurAffichee,
+      emoji: kpi.icone,
+      icon: Icons.analytics_outlined,
+      color: couleur,
+      valueColor: !kpi.disponible
+          ? Colors.grey
+          : (negatif ? Colors.red : Colors.black87),
+      subtitle: kpi.disponible ? null : 'Pas encore calculé',
+    );
+  }
+
+  Widget _buildNiveauErreur(String message) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ),
+          TextButton(
+            onPressed: _refreshData,
+            child: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHorizontalScrollRow(List<Widget> children) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -455,7 +420,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: ListTile(
         dense: true,
-        leading: Icon(icon, color: const Color(0xFF1B75BC), size: 20),
+        leading: Icon(icon, color: AppColors.vert, size: 20),
         title: Text(
           title,
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),

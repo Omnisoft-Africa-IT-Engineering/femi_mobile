@@ -11,7 +11,7 @@ class StatutBadge extends StatelessWidget {
       case StatutDevis.brouillon:
         return Colors.grey;
       case StatutDevis.valide:
-        return const Color(0xFF1B75BC);
+        return const Color(0xFFB45309);
       case StatutDevis.facture:
         return const Color(0xFF006654);
       case StatutDevis.annule:

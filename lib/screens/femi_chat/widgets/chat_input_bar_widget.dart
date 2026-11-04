@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../theme/app_colors.dart';
 class ChatInputBarWidget extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
 
   final Function(bool isCamera)? onPickImage;
   final VoidCallback? onPickPdf;
+
+  /// Une image ou un PDF est en attente d'envoi : le bouton d'envoi doit
+  /// apparaître même sans texte.
+  final bool hasAttachment;
 
   final VoidCallback? onStartRecording;
   final VoidCallback? onPauseRecording;
@@ -24,6 +29,7 @@ class ChatInputBarWidget extends StatefulWidget {
     required this.onSend,
     this.onPickImage,
     this.onPickPdf,
+    this.hasAttachment = false,
     this.onStartRecording,
     this.onPauseRecording,
     this.onResumeRecording,
@@ -70,6 +76,8 @@ class _ChatInputBarWidgetState extends State<ChatInputBarWidget> {
   ];
 
   bool get _hasText => widget.controller.text.trim().isNotEmpty;
+
+  bool get _canSend => _hasText || widget.hasAttachment;
 
   @override
   void initState() {
@@ -162,7 +170,7 @@ class _ChatInputBarWidgetState extends State<ChatInputBarWidget> {
                   _option(
                     Icons.photo_library_rounded,
                     'Galerie',
-                    const Color(0xFF005AC1),
+                    AppColors.vert,
                     () {
                       Navigator.pop(context);
                       widget.onPickImage!(false);
@@ -353,7 +361,7 @@ class _ChatInputBarWidgetState extends State<ChatInputBarWidget> {
   }
 
   Widget _buildNormalBar() {
-    final showSend = _hasText;
+    final showSend = _canSend;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -403,7 +411,7 @@ class _ChatInputBarWidgetState extends State<ChatInputBarWidget> {
                             if (HardwareKeyboard.instance.isShiftPressed) {
                               return KeyEventResult.ignored;
                             }
-                            if (_hasText) {
+                            if (_canSend) {
                               widget.onSend();
                               return KeyEventResult.handled;
                             }

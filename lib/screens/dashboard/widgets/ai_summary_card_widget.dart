@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class AiSummaryCardWidget extends StatelessWidget {
   final String title;
   final String message;
@@ -24,7 +25,7 @@ class AiSummaryCardWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: const BoxDecoration(
-              color: Color(0xFF1B75BC),
+              color: AppColors.vert,
               shape: BoxShape.circle,
             ),
             child: const Icon(

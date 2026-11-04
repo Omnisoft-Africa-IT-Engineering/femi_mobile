@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "924074246865-3f7fv1kt49ecgilnp1sfdi6rlvtvg9cp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.femi_mobile",
+            "certificate_hash": "860ad0813f57e1667f742e3f8c18df8aaf49f679"
+          }
+        },
+        {
           "client_id": "924074246865-57tvb8qbn7sm2jsr3pt50scb0678i88c.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

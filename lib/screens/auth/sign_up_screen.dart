@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../onboarding/company_info_screen.dart';
 
+import '../../theme/app_colors.dart';
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
 
@@ -21,7 +22,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   static const Color _bgColor = Color(0xFFF7F9FC);
   static const Color _accentTeal = Color(0xFF80F2DD);
   static const Color _darkGreen = Color(0xFF0D5C52);
-  static const Color _primaryBlue = Color(0xFF1565D8);
+  static const Color _primaryColor = AppColors.vert;
 
   @override
   void dispose() {
@@ -260,7 +261,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: _handleNextStep,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _primaryBlue,
+                      backgroundColor: _primaryColor,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -325,7 +326,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
             height: 4,
             margin: EdgeInsets.only(right: step < 3 ? 6 : 0),
             decoration: BoxDecoration(
-              color: active ? _primaryBlue : Colors.grey.shade300,
+              color: active ? _primaryColor : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(4),
             ),
           ),

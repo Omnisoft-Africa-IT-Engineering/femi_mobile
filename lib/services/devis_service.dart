@@ -192,7 +192,7 @@ class DevisService {
       final r = await http
           .get(Uri.parse('$_base/profil/'), headers: await _headers())
           .timeout(_delai);
-      if (r.statusCode != 200) {
+      if (r.statusCode != 200 && r.statusCode != 201){
         debugPrint('Devis profil: ${r.statusCode} - ${r.body}');
         return null;
       }
@@ -226,6 +226,7 @@ class DevisService {
     }
   }
 
+
   // POST /api/v1/devis/profil/logo/ (champ multipart « logo »)
   Future<void> _envoyerLogo(String chemin) async {
     final entetes = await _headers();
@@ -243,6 +244,18 @@ class DevisService {
       throw Exception(_messageErreur(
           r, "Les informations sont enregistrées, mais le logo n'a pas pu "
               "être envoyé (erreur ${r.statusCode})."));
+    }
+  }
+
+  // DELETE /api/v1/devis/profil/logo/
+  Future<void> supprimerLogo() async {
+    final r = await http
+        .delete(Uri.parse('$_base/profil/logo/'), headers: await _headers())
+        .timeout(_delai);
+    if (r.statusCode != 200 && r.statusCode != 204) {
+      debugPrint('Devis profil (suppression logo): ${r.statusCode} - ${r.body}');
+      throw Exception(_messageErreur(
+          r, 'Impossible de supprimer le logo (erreur ${r.statusCode}).'));
     }
   }
 }

@@ -3,6 +3,7 @@ import '../../services/femi_api_service.dart';
 import 'widgets/compte_card_widget.dart';
 import '../../services/pdf_export_service.dart';
 
+import '../../theme/app_colors.dart';
 class GrandLivreScreen extends StatefulWidget {
   const GrandLivreScreen({super.key});
 
@@ -165,7 +166,7 @@ class _GrandLivreScreenState extends State<GrandLivreScreen> {
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1B75BC),
+                          backgroundColor: AppColors.vert,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(

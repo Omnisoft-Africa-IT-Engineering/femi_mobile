@@ -5,6 +5,7 @@ import 'widgets/total_bilan_card.dart';
 import 'widgets/financial_section_card.dart';
 import '../registre_journalier/widgets/exercice_selector_widget.dart';
 
+import '../../theme/app_colors.dart';
 class EtatFinancierScreen extends StatefulWidget {
   const EtatFinancierScreen({super.key});
 
@@ -154,7 +155,7 @@ class _EtatFinancierScreenState extends State<EtatFinancierScreen> {
                       ),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1B75BC),
+                          backgroundColor: AppColors.vert,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

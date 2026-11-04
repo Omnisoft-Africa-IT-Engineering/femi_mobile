@@ -41,6 +41,7 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
   late final TextEditingController _conditions;
   String? _logoPath;
   bool _saving = false;
+  bool _logoSupprime = false;
 
   bool get _premiereFois =>
       widget.initial == null || !widget.initial!.pretPourDevis;
@@ -72,7 +73,19 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
       maxWidth: 800,
       imageQuality: 85,
     );
-    if (x != null) setState(() => _logoPath = x.path);
+    if (x != null) {
+      setState(() {
+        _logoPath = x.path;
+        _logoSupprime = false;
+      });
+    }
+  }
+
+  void _retirerLogo() {
+    setState(() {
+      _logoPath = null;
+      _logoSupprime = widget.initial?.logoUrl != null;
+    });
   }
 
   String? _obligatoire(String? v) =>
@@ -96,6 +109,9 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
           logoLocalPath: _logoPath,
         ),
       );
+      if (_logoSupprime && _logoPath == null) {
+        await DevisService.instance.supprimerLogo();
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -112,7 +128,7 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
     ImageProvider? image;
     if (_logoPath != null) {
       image = FileImage(File(_logoPath!));
-    } else if (widget.initial?.logoUrl != null) {
+    } else if (!_logoSupprime && widget.initial?.logoUrl != null) {
       image = NetworkImage(widget.initial!.logoUrl!);
     }
     return Row(
@@ -127,12 +143,24 @@ class _ProfilFacturationSheetState extends State<_ProfilFacturationSheet> {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: OutlinedButton.icon(
-            onPressed: _choisirLogo,
-            icon: const Icon(Icons.image_outlined),
-            label: Text(image == null
-                ? 'Ajouter un logo (optionnel)'
-                : 'Changer le logo'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _choisirLogo,
+                icon: const Icon(Icons.image_outlined),
+                label: Text(image == null
+                    ? 'Ajouter un logo (optionnel)'
+                    : 'Changer le logo'),
+              ),
+              if (image != null)
+                TextButton.icon(
+                  onPressed: _retirerLogo,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Supprimer le logo'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                ),
+            ],
           ),
         ),
       ],

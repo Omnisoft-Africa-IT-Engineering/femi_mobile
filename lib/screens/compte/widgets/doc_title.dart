@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 class DocTile extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -21,7 +22,7 @@ class DocTile extends StatelessWidget {
     final bool isLocked = isProFeature && !isUserPro;
 
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF1B75BC)),
+      leading: Icon(icon, color: AppColors.vert),
       title: Row(
         children: [
           Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),

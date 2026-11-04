@@ -76,7 +76,7 @@ class _MembresScreenState extends State<MembresScreen> {
       case 'admin':
         return const Color(0xFF006654);
       case 'comptable':
-        return const Color(0xFF1B75BC);
+        return const Color(0xFF7C3AED);
       case 'employe':
         return Colors.orange.shade700;
       case 'lecteur':

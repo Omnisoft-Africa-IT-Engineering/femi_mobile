@@ -5,6 +5,7 @@ import '../registre_journalier/widgets/exercice_selector_widget.dart';
 import '../etat_financier/widgets/total_bilan_card.dart';
 import 'widgets/balance_account_table.dart';
 
+import '../../theme/app_colors.dart';
 class BalanceAuxiliaireScreen extends StatefulWidget {
   const BalanceAuxiliaireScreen({super.key});
 
@@ -141,7 +142,7 @@ class _BalanceAuxiliaireScreenState extends State<BalanceAuxiliaireScreen> {
                     children: [
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1B75BC),
+                          backgroundColor: AppColors.vert,
                           elevation: 0,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
